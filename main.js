@@ -139,6 +139,11 @@ ipcMain.handle('fila:processar', async (event, itens) => {
             ticketNum,
             sucesso: true
           });
+          try {
+            await bot.ensureTicketPage();
+          } catch (e) {
+            logMain('Falha ao voltar para pagina de criacao: ' + e.message);
+          }
         } else {
           mainWindow.webContents.send('fila:item-concluido', {
             item,
@@ -146,6 +151,11 @@ ipcMain.handle('fila:processar', async (event, itens) => {
             sucesso: false,
             erro: 'Nao foi possivel capturar o numero do ticket'
           });
+          try {
+            await bot.ensureTicketPage();
+          } catch (e) {
+            logMain('Falha ao voltar para pagina de criacao: ' + e.message);
+          }
         }
       } catch (err) {
         logMain(`Erro no item ${i + 1}: ${err.message}`);
@@ -155,6 +165,11 @@ ipcMain.handle('fila:processar', async (event, itens) => {
           sucesso: false,
           erro: err.message
         });
+        try {
+          await bot.ensureTicketPage();
+        } catch (e) {
+          logMain('Falha ao voltar para pagina de criacao: ' + e.message);
+        }
       }
     }
 

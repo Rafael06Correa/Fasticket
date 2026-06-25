@@ -115,7 +115,9 @@ class PlaywrightBot {
   async detectPage() {
     return await this.page.evaluate(() => {
       if (document.querySelector('#txtLogin')) return 'login';
-      if (document.querySelector('#frmNovoTicket') || document.querySelector('#TicketMlo_Cliente_Codigo')) return 'ticket';
+      if (document.querySelector('#frmNovoTicket')) return 'criacao';
+      if (document.querySelector('#TicketMlo_Cliente_Codigo')) return 'detalhes';
+      if (document.querySelector('.nav.nav-list') || document.querySelector('[class*="NovoTicket"]')) return 'detalhes';
       return 'lista';
     });
   }
@@ -263,8 +265,13 @@ class PlaywrightBot {
     if (item.modulo) {
       log('Etapa 4: Modulo...');
       await this.selectFromChosen('TicketMlo_Modulo_Id_chosen', item.modulo);
-      await sleep(1000);
+      await sleep(2000);
     }
+
+    log('Etapa 4.5: Selecionando Responsavel (usuario logado)...');
+    const responsavelOk = await this.selectResponsavel();
+    log(`Responsavel: ${responsavelOk ? 'OK' : 'FALHOU'}`);
+    await sleep(1000);
 
     if (item.titulo) {
       log('Etapa 5: Assunto...');
@@ -342,10 +349,99 @@ class PlaywrightBot {
     log(`Ticket: ${ticketNum || 'NAO CAPTURADO'}`);
 
     if (item.concluido && ticketNum) {
-      await this.concluirTicket();
+      try {
+        await this.concluirTicket();
+      } catch (e) {
+        log('Erro na conclusao: ' + e.message);
+      }
     }
 
     return ticketNum;
+  }
+
+  async selectResponsavel() {
+    const usuarioLogado = await this.page.evaluate(() => {
+      const el = document.querySelector('#TicketMlo_OperadorResponsavel_Id');
+      if (el && el.value) return el.value;
+      const headerUser = document.querySelector('.user-info, .navbar-user, [class*="usuario"]');
+      if (headerUser) return headerUser.textContent.trim();
+      return null;
+    });
+    log(`  Usuario logado (hidden): ${usuarioLogado || 'N/A'}`);
+
+    const responsavelValue = await this.page.evaluate(() => {
+      const hidden = document.querySelector('#TicketMlo_OperadorResponsavel_Id');
+      return hidden ? hidden.value : null;
+    });
+
+    if (responsavelValue) {
+      log(`  Responsavel ja definido: ${responsavelValue}`);
+      return true;
+    }
+
+    const selecionado = await this.page.evaluate(() => {
+      const select = document.querySelector('#Responsavel');
+      if (!select) return { ok: false, reason: '#Responsavel nao encontrado' };
+
+      const operadorId = document.querySelector('#TicketMlo_OperadorResponsavel_Id');
+      if (operadorId && operadorId.value) return { ok: true, value: operadorId.value };
+
+      const options = select.querySelectorAll('option');
+      for (const opt of options) {
+        if (opt.value && opt.value !== '' && opt.value !== 'N2' && opt.value !== 'Produtos' &&
+            opt.value !== 'Desenvolvimento' && opt.value !== 'Outros' && !opt.parentElement.matches('optgroup[label=""]')) {
+          const texto = opt.textContent.trim().toUpperCase();
+          if (texto === 'PEDRO.JORDAO' || texto === 'PEDRO.JORDÃ' || texto.includes('PEDRO.JORDAO')) {
+            select.value = opt.value;
+            operadorId.value = opt.value;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            return { ok: true, value: opt.value, texto: opt.textContent.trim() };
+          }
+        }
+      }
+
+      const loggedHeader = document.querySelector('.user-name, .navbar .dropdown-toggle, [class*="ola"]');
+      let username = '';
+      if (loggedHeader) {
+        const match = loggedHeader.textContent.match(/Ol[áa],?\s*(\S+)/i);
+        if (match) username = match[1].toUpperCase();
+      }
+      if (!username) {
+        const allText = document.body.innerText;
+        const m = allText.match(/Ol[áa],?\s*(\S+)/i);
+        if (m) username = m[1].toUpperCase();
+      }
+
+      if (username) {
+        for (const opt of options) {
+          if (opt.value && opt.value !== '' && opt.value !== 'N2' && opt.value !== 'Produtos' &&
+              opt.value !== 'Desenvolvimento' && opt.value !== 'Outros') {
+            const texto = opt.textContent.trim().toUpperCase();
+            if (texto === username || texto.includes(username)) {
+              select.value = opt.value;
+              operadorId.value = opt.value;
+              select.dispatchEvent(new Event('change', { bubbles: true }));
+              return { ok: true, value: opt.value, texto: opt.textContent.trim() };
+            }
+          }
+        }
+      }
+
+      for (const opt of options) {
+        if (opt.value && opt.value !== '' && opt.value !== 'N2' && opt.value !== 'Produtos' &&
+            opt.value !== 'Desenvolvimento' && opt.value !== 'Outros') {
+          select.value = opt.value;
+          operadorId.value = opt.value;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          return { ok: true, value: opt.value, texto: opt.textContent.trim() };
+        }
+      }
+
+      return { ok: false, reason: 'nenhum operador encontrado' };
+    });
+
+    log(`  Resultado: ${JSON.stringify(selecionado)}`);
+    return selecionado.ok;
   }
 
   async concluirTicket() {
@@ -510,11 +606,45 @@ A sua satisfação é o nosso maior objetivo! Agradecemos se puder avaliar o nos
 
   async ensureTicketPage() {
     const page = await this.detectPage();
-    log('Pagina: ' + page);
+    log('Pagina detectada: ' + page);
 
     if (page === 'login') throw new Error('Sessao expirada');
 
-    if (page !== 'ticket') {
+    if (page === 'detalhes') {
+      log('Na pagina de detalhes, clicando em Novo Ticket...');
+      const clicked = await this.page.evaluate(() => {
+        const links = document.querySelectorAll('a, button, span, li');
+        for (const el of links) {
+          const texto = el.textContent.trim().toUpperCase();
+          if (texto.includes('NOVO TICKET') || texto.includes('NOVOTICKET')) {
+            el.click();
+            return true;
+          }
+        }
+        const navLink = document.querySelector('.nav.nav-list a[href*="NovoTicket"], .nav.nav-list a[href*="Ticket"]');
+        if (navLink) {
+          navLink.click();
+          return true;
+        }
+        return false;
+      });
+
+      if (clicked) {
+        await sleep(4000);
+        log('Navegou para criacao de ticket');
+      } else {
+        log('Nao encontrou botao Novo Ticket, navegando via URL...');
+        await this.page.goto(TICKET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await sleep(4000);
+      }
+    }
+
+    if (page === 'criacao') {
+      log('Ja na pagina de criacao');
+      return;
+    }
+
+    if (page === 'lista') {
       await this.page.goto(TICKET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await sleep(4000);
     }
