@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>TkMon</title>
+  <link rel="stylesheet" href="renderer.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Titlebar -->
+    <div class="titlebar">
+      <div class="titlebar-title">
+        <div class="titlebar-logo">T</div>
+        <span>TkMon</span>
+      </div>
+      <div class="titlebar-controls">
+        <button class="titlebar-btn" id="btn-minimize">
+          <svg width="12" height="12" viewBox="0 0 12 12"><rect y="5" width="12" height="1" fill="currentColor"/></svg>
+        </button>
+        <button class="titlebar-btn" id="btn-maximize">
+          <svg width="12" height="12" viewBox="0 0 12 12"><rect x="1" y="1" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+        </button>
+        <button class="titlebar-btn titlebar-close" id="btn-close">
+          <svg width="12" height="12" viewBox="0 0 12 12"><line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" stroke-width="1.5"/><line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" stroke-width="1.5"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <nav class="sidebar-nav">
+          <button class="sidebar-btn active" data-view="novo">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span>Novo</span>
+          </button>
+          <button class="sidebar-btn" data-view="fila">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            <span>Fila</span>
+            <span class="badge" id="badge-fila" style="display:none">0</span>
+          </button>
+          <button class="sidebar-btn" data-view="historico">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Historico</span>
+          </button>
+          <button class="sidebar-btn" data-view="config">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span>Config</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="status-dot" id="status-dot"></div>
+          <span id="status-text">Pronto</span>
+        </div>
+      </aside>
+
+      <!-- Main -->
+      <main class="main">
+        <div class="main-header">
+          <h2 id="view-title">Novo Atendimento</h2>
+        </div>
+
+        <div class="main-content">
+          <!-- Novo Atendimento -->
+          <section id="view-novo" class="view active">
+            <form id="form-novo" class="form-card">
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="campo-empresa">Empresa</label>
+                  <input type="text" id="campo-empresa" placeholder="Ex: ABC SBC" required>
+                </div>
+                <div class="form-group">
+                  <label for="campo-contato">Contato</label>
+                  <input type="text" id="campo-contato" placeholder="Ex: Joao Silva" required>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="campo-modulo">Modulo</label>
+                  <input type="text" id="campo-modulo" placeholder="Ex: LUN, WCE, ADM" required>
+                </div>
+                <div class="form-group placeholder-group"></div>
+              </div>
+              <div class="form-group full">
+                <label for="campo-titulo">Titulo (Assunto)</label>
+                <input type="text" id="campo-titulo" placeholder="Ex: Erro ao gerar relatorio" required>
+              </div>
+              <div class="form-group full">
+                <label for="campo-descricao">Descricao do Problema</label>
+                <textarea id="campo-descricao" rows="7" placeholder="Descreva o problema do cliente..." required>Prezados,
+
+tudo bem?
+
+Estou criando esse ticket a fim de formalizar um atendimento.
+
+</textarea>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  Salvar Rascunho
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <!-- Fila -->
+          <section id="view-fila" class="view">
+            <div class="fila-top">
+              <span class="fila-count" id="fila-count">0 rascunho(s)</span>
+              <button id="btn-processar-todos" class="btn btn-success">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Processar Fila
+              </button>
+            </div>
+            <div id="lista-fila" class="lista"></div>
+          </section>
+
+          <!-- Historico -->
+          <section id="view-historico" class="view">
+            <div id="lista-historico" class="lista"></div>
+          </section>
+
+          <!-- Config -->
+          <section id="view-config" class="view">
+            <form id="form-config" class="form-card">
+              <p class="form-desc">Credenciais utilizadas para login automatico no portal.</p>
+              <div class="form-group full">
+                <label for="campo-usuario">Usuario</label>
+                <input type="text" id="campo-usuario" placeholder="Seu usuario de acesso" required>
+              </div>
+              <div class="form-group full">
+                <label for="campo-senha">Senha</label>
+                <input type="password" id="campo-senha" placeholder="Sua senha" required>
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  Salvar Credenciais
+                </button>
+              </div>
+            </form>
+            <div id="config-status" class="status-msg" style="display:none"></div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Modal Editar -->
+  <div id="modal-editar" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Editar Rascunho</h3>
+        <button id="btn-fechar-modal" class="modal-close">&times;</button>
+      </div>
+      <form id="form-editar" class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="edit-empresa">Empresa</label>
+            <input type="text" id="edit-empresa" required>
+          </div>
+          <div class="form-group">
+            <label for="edit-contato">Contato</label>
+            <input type="text" id="edit-contato" required>
+          </div>
+        </div>
+        <div class="form-group full">
+          <label for="edit-modulo">Modulo</label>
+          <input type="text" id="edit-modulo" required>
+        </div>
+        <div class="form-group full">
+          <label for="edit-titulo">Titulo (Assunto)</label>
+          <input type="text" id="edit-titulo" required>
+        </div>
+        <div class="form-group full">
+          <label for="edit-descricao">Descricao do Problema</label>
+          <textarea id="edit-descricao" rows="5" required></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" id="btn-cancelar-editar">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Alteracoes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" style="display:none"></div>
+  <script src="renderer.js"></script>
+</body>
+</html>
