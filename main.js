@@ -121,7 +121,7 @@ ipcMain.handle('fila:processar', async (event, itens) => {
         logMain(`Item ${i + 1} resultado: ticket=${ticketNum}`);
         if (ticketNum) {
           await db.historico.insert({
-            numero: ticketNum,
+            numero: String(ticketNum),
             empresa: item.empresaNome || item.empresa,
             criadoEm: new Date().toISOString()
           });

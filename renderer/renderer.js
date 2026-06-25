@@ -210,9 +210,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.api.fila.onItemConcluido((data) => {
     if (data.sucesso) {
-      showToast(`Ticket #${data.ticketNum} criado com sucesso!`);
+      const num = String(data.ticketNum);
+      const msg = data.item.concluido
+        ? `Ticket #${num} criado e CONCLUIDO!`
+        : `Ticket #${num} criado com sucesso!`;
+      showToast(msg, 5000);
     } else {
-      showToast(`Erro: ${data.erro}`);
+      showToast(`Erro: ${data.erro}`, 5000);
     }
     renderFila();
     renderHistorico();
@@ -238,7 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="historico-left">
           <div class="historico-icon">#</div>
           <div class="historico-info">
-            <span class="historico-ticket">#${esc(h.numero)}</span>
+            <span class="historico-ticket">#${esc(String(h.numero))}</span>
             <span class="historico-empresa">${esc(h.empresa)}</span>
           </div>
         </div>

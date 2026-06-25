@@ -341,7 +341,171 @@ class PlaywrightBot {
     const ticketNum = await this.getTicketNumber();
     log(`Ticket: ${ticketNum || 'NAO CAPTURADO'}`);
 
+    if (item.concluido && ticketNum) {
+      await this.concluirTicket();
+    }
+
     return ticketNum;
+  }
+
+  async concluirTicket() {
+    log('=== CONCLUSAO ===');
+
+    await sleep(2000);
+
+    log('Etapa C1: Preenchendo tramite de fechamento...');
+    const textoTramite = `Olá.
+
+Estamos concluindo o atendimento.
+Em caso de necessidade, salientamos que esse ticket pode ser reaberto em até 5 dias ou um novo ticket pode ser aberto a qualquer instante.
+
+A sua satisfação é o nosso maior objetivo! Agradecemos se puder avaliar o nosso atendimento e também a solução dada para a sua demanda.
+:)`;
+
+    const htmlTramite = '<div>' + textoTramite.replace(/\n/g, '</div><div>') + '</div>';
+
+    await withTimeout(
+      this.page.evaluate((html) => {
+        const editor = document.querySelector('#EditorTramite');
+        if (editor) {
+          editor.focus();
+          editor.innerHTML = html;
+          editor.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        const hiddenDesc = document.querySelector('#TramiteMlo_Descricao');
+        if (hiddenDesc) hiddenDesc.value = html;
+      }, htmlTramite),
+      10000, 'preencher-editor-tramite'
+    );
+
+    log('Etapa C2: Selecionando Natureza (Ajuda)...');
+    await this.page.evaluate(() => {
+      const btn = document.querySelector('#btnOpcoesNatureza');
+      if (btn) btn.click();
+    });
+    await sleep(800);
+
+    await this.page.evaluate(() => {
+      const itens = document.querySelectorAll('#listaNatureza li a.itemNatureza');
+      for (const item of itens) {
+        const li = item.closest('li');
+        if (li && !li.classList.contains('hide')) {
+          item.click();
+          break;
+        }
+      }
+    });
+    await sleep(800);
+
+    const naturezaOk = await this.page.evaluate(() => {
+      const val = document.querySelector('#TicketMlo_TicketDetalhes_Natureza');
+      return val ? val.value : 'NAO';
+    });
+    log(`Natureza hidden value: ${naturezaOk}`);
+
+    log('Etapa C3: Selecionando Prioridade (Baixa)...');
+    await this.page.evaluate(() => {
+      const btn = document.querySelector('#btnOpcoesPrioridade');
+      if (btn) btn.click();
+    });
+    await sleep(800);
+
+    await this.page.evaluate(() => {
+      const itens = document.querySelectorAll('#listaPrioridade li a.itemPrioridade');
+      for (const item of itens) {
+        const li = item.closest('li');
+        if (li && !li.classList.contains('hide')) {
+          item.click();
+          break;
+        }
+      }
+    });
+    await sleep(800);
+
+    const prioridadeOk = await this.page.evaluate(() => {
+      const val = document.querySelector('#TicketMlo_TicketDetalhes_Prioridade');
+      return val ? val.value : 'NAO';
+    });
+    log(`Prioridade hidden value: ${prioridadeOk}`);
+
+    log('Etapa C4: Definindo status Concluido...');
+    await this.page.evaluate(() => {
+      const s = document.querySelector('#TicketMlo_Status');
+      if (s) {
+        s.value = '7';
+        if (typeof $ !== 'undefined') $(s).trigger('chosen:updated');
+      }
+    });
+    await sleep(500);
+
+    log('Etapa C5: Selecionando CONCLUIDO no dropdown do btnEnviar...');
+    await this.page.evaluate(() => {
+      const btn = document.querySelector('#btnListaStatus');
+      if (btn) btn.click();
+    });
+    await sleep(1000);
+
+    await this.page.evaluate(() => {
+      const itens = document.querySelectorAll('#listaStatus a.itemStatus');
+      for (const item of itens) {
+        if (item.id === '7') { item.click(); break; }
+      }
+    });
+    await sleep(500);
+
+    const btnTexto = await this.page.evaluate(() => {
+      const b = document.querySelector('#btnEnviar');
+      return b ? b.textContent.trim() : 'NAO';
+    });
+    log(`btnEnviar texto: ${btnTexto}`);
+    await this.screenshot('antes-enviar-conclusao');
+
+    log('Etapa C6: Clicando btnEnviar...');
+    await this.page.evaluate(() => {
+      const btn = document.querySelector('#btnEnviar');
+      if (btn) btn.click();
+    });
+    await sleep(3000);
+    await this.screenshot('pos-enviar-conclusao');
+
+    log('Etapa C7: Procurando dialog de confirmacao...');
+    let encontrouDialog = await this.page.evaluate(() => {
+      const botoes = document.querySelectorAll('button[data-bb-handler="confirm"]');
+      for (const b of botoes) {
+        if (b.offsetParent !== null || window.getComputedStyle(b.closest('.modal')).display !== 'none') {
+          b.click();
+          return { ok: true, texto: b.textContent.trim() };
+        }
+      }
+      const todosBtns = document.querySelectorAll('.modal.in button, .modal[style*="display: block"] button');
+      for (const b of todosBtns) {
+        const txt = b.textContent.trim().toUpperCase();
+        if (txt === 'SIM' || txt === 'OK') {
+          b.click();
+          return { ok: true, texto: b.textContent.trim() };
+        }
+      }
+      return { ok: false };
+    });
+
+    if (encontrouDialog.ok) {
+      log(`Dialog confirmado: "${encontrouDialog.texto}"`);
+      await sleep(4000);
+    } else {
+      log('Dialog nao encontrado, tentando via formulario...');
+      await this.page.evaluate(() => {
+        const form = document.querySelector('#frmTicketPrincipal');
+        if (form) {
+          const disabled = form.querySelectorAll(':input:disabled');
+          disabled.forEach(d => d.removeAttribute('disabled'));
+          form.submit();
+        }
+      });
+      await sleep(4000);
+    }
+
+    await this.screenshot('final-conclusao');
+    log('Conclusao finalizada.');
   }
 
   async ensureTicketPage() {
