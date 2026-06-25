@@ -1,2 +1,5 @@
 node_modules/
 db/*.db
+db/*.png
+referencias/*.png
+referencias/*.jpg
