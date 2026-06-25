@@ -10,7 +10,10 @@ let mainWindow;
 let db = {};
 
 function initDB() {
-  const dbPath = path.join(__dirname, 'db');
+  const dbPath = path.join(app.getPath('userData'), 'db');
+  if (!require('fs').existsSync(dbPath)) {
+    require('fs').mkdirSync(dbPath, { recursive: true });
+  }
   db.fila = Datastore.create({ filename: path.join(dbPath, 'fila.db'), autoload: true });
   db.historico = Datastore.create({ filename: path.join(dbPath, 'historico.db'), autoload: true });
   db.credenciais = Datastore.create({ filename: path.join(dbPath, 'credenciais.db'), autoload: true });
