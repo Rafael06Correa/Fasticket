@@ -1,4 +1,4 @@
-const { chromium } = require('playwright');
+const { chromium } = require('playwright-core');
 const path = require('path');
 
 const PORTAL_URL = 'https://portaldocliente.praxio.com.br';
@@ -31,8 +31,10 @@ class PlaywrightBot {
 
   async init() {
     log('Iniciando browser headless...');
+    const browserPath = path.join(__dirname, '..', 'browser', 'chrome-win64', 'chrome.exe');
     this.browser = await chromium.launch({
       headless: true,
+      executablePath: browserPath,
       args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
     const context = await this.browser.newContext({

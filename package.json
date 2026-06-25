@@ -5,14 +5,13 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "rebuild": "electron-rebuild"
+    "build": "npx @electron/packager . Fasticket --platform=win32 --arch=x64 --out=./out --overwrite"
   },
   "dependencies": {
-    "electron": "^28.0.0",
     "nedb-promises": "^6.2.3",
-    "playwright": "^1.40.0"
+    "playwright-core": "^1.61.1"
   },
   "devDependencies": {
-    "electron-rebuild": "^3.2.9"
+    "electron": "^28.0.0"
   }
 }
