@@ -1,7 +1,7 @@
 {
-  "name": "tkmon",
+  "name": "fasticket",
   "version": "1.0.0",
-  "description": "Assistente Autonomo de Tickets - Desktop",
+  "description": "Fasticket - Automação de Tickets no Praxio",
   "main": "main.js",
   "scripts": {
     "start": "electron .",

@@ -1,16 +1,17 @@
-# TkMon
+# Fasticket
 
-Aplicativo desktop para **automação de criação de tickets de suporte** no portal Praxio.
+Aplicativo desktop para **automação de criação e conclusão de tickets de suporte** no portal Praxio.
 
 ## O que é
 
-O TkMon é um cliente batch que permite criar tickets no portal Praxio de forma automatizada. Ele resolves o problema de analistas que precisam abrir muitos tickets manualmente, repetitivamente e com risco de erros.
+O Fasticket é um cliente batch que permite criar e concluir tickets no portal Praxio de forma automatizada. Ele resolve o problema de analistas que precisam abrir muitos tickets manualmente, repetitivamente e com risco de erros.
 
 ## Funcionalidades
 
 - **Criação offline** — monte tickets sem estar conectado ao portal
 - **Fila de envio** — salve vários rascunhos, edite ou exclua antes de enviar
 - **Envio automatizado** — bot Playwright loga, preenche e submete os tickets automaticamente
+- **Conclusão automática** — marque o ticket como concluído e o bot preenche trâmite, natureza, prioridade e submete como Concluído
 - **Histórico** — acompanhe os últimos 5 tickets criados
 - **Configuração** — salve suas credenciais do portal localmente
 
@@ -23,8 +24,8 @@ O TkMon é um cliente batch que permite criar tickets no portal Praxio de forma 
 
 ```bash
 # Clone o repositório
-git clone https://github.com/SEU-USUARIO/tkMon.git
-cd tkMon
+git clone https://github.com/Rafael06Correa/Fasticket.git
+cd Fasticket
 
 # Instale as dependências
 npm install
@@ -42,7 +43,7 @@ npm start
 ## Estrutura do projeto
 
 ```
-tkMon/
+Fasticket/
 ├── main.js                    # Processo principal do Electron
 ├── preload.js                 # Bridge IPC seguro
 ├── bot/
@@ -56,7 +57,7 @@ tkMon/
 │   ├── historico.db           # Banco de dados do histórico
 │   └── credenciais.db         # Banco de dados das credenciais
 └── referencias/
-    └── 1.jpg                  # Referência do portal
+    └── referências visuais do portal
 ```
 
 ## Tecnologias
@@ -67,10 +68,6 @@ tkMon/
 | UI | HTML/CSS/JS vanilla |
 | Automação | Playwright (Chromium headless) |
 | Banco local | NeDB |
-
-## Capturas de tela
-
-![Interface](referencias/1.jpg)
 
 ## Licença
 
