@@ -358,21 +358,22 @@ class PlaywrightBot {
 
   async getTicketNumber() {
     return await this.page.evaluate(() => {
-      const url = window.location.href;
-      let m = url.match(/TicketPrincipal\/(\d+)/i) || url.match(/Ticket\/(\d+)/i);
-      if (m) return m[1];
+      const allText = document.body.innerText;
 
-      const h1 = document.querySelector('.page-header h1');
-      if (h1) {
-        const hm = h1.textContent.match(/(\d{3}-\d{5})/);
-        if (hm) return hm[1];
+      const labelMatch = allText.match(/(?:Numero\s*(?:do\s*)?Ticket|N[uú]mero\s*(?:do\s*)?)[:\s]*(\d{4}[-.]?\d{6})/i);
+      if (labelMatch) return labelMatch[1].replace('.', '-');
+
+      const spans = document.querySelectorAll('span, td, div, label, strong, b, p');
+      for (const el of spans) {
+        const txt = el.textContent.trim();
+        if (/(?:numero|ticket)/i.test(txt)) {
+          const m = txt.match(/(\d{4}[-.]?\d{6})/);
+          if (m) return m[1].replace('.', '-');
+        }
       }
 
-      const bread = document.querySelector('.breadcrumb .active');
-      if (bread) {
-        const bm = bread.textContent.match(/(\d{3}-\d{5})/);
-        if (bm) return bm[1];
-      }
+      const genericMatch = allText.match(/(\d{4}-\d{6})/);
+      if (genericMatch) return genericMatch[1];
 
       return null;
     });
