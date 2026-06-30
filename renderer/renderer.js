@@ -224,6 +224,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ========== HISTORICO ==========
+  document.getElementById('btn-limpar-historico').addEventListener('click', async () => {
+    await window.api.historico.clear();
+    showToast('Historico limpo!');
+    renderHistorico();
+  });
+
   async function renderHistorico() {
     const hist = await window.api.historico.get();
     const container = document.getElementById('lista-historico');

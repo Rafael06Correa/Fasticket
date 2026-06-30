@@ -39,16 +39,10 @@ body {
 }
 
 .titlebar-logo {
-  width: 22px;
-  height: 22px;
-  background: linear-gradient(135deg, #ef4444, #dc2626);
+  width: 28px;
+  height: 28px;
   border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 11px;
-  color: white;
+  object-fit: contain;
 }
 
 .titlebar-title span {
@@ -472,6 +466,12 @@ body {
   font-size: 13px;
   color: #94a3b8;
   font-weight: 500;
+}
+
+.historico-top {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 14px;
 }
 
 /* ========== CARDS ========== */

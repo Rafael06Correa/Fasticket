@@ -3,9 +3,12 @@
   "version": "1.0.0",
   "description": "Fasticket - Automação de Tickets no Praxio",
   "main": "main.js",
+  "build": {
+    "icon": "assets/icon.png"
+  },
   "scripts": {
     "start": "electron .",
-    "build": "npx @electron/packager . Fasticket --platform=win32 --arch=x64 --out=./out --overwrite"
+    "build": "npx @electron/packager . Fasticket --platform=win32 --arch=x64 --out=./out --overwrite --icon=assets/icon.png"
   },
   "dependencies": {
     "nedb-promises": "^6.2.3",
