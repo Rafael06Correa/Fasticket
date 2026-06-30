@@ -13,7 +13,8 @@ contextBridge.exposeInMainWorld('api', {
   },
   historico: {
     get: () => ipcRenderer.invoke('historico:get'),
-    add: (entry) => ipcRenderer.invoke('historico:add', entry)
+    add: (entry) => ipcRenderer.invoke('historico:add', entry),
+    clear: () => ipcRenderer.invoke('historico:clear')
   },
   credenciais: {
     get: () => ipcRenderer.invoke('credenciais:get'),

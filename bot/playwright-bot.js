@@ -1,4 +1,4 @@
-const { chromium } = require('playwright');
+const { chromium } = require('playwright-core');
 const path = require('path');
 
 const PORTAL_URL = 'https://portaldocliente.praxio.com.br';
@@ -14,6 +14,10 @@ function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
 
+function normalizar(str) {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+}
+
 function withTimeout(promise, ms, label) {
   return Promise.race([
     promise,
@@ -27,12 +31,15 @@ class PlaywrightBot {
   constructor() {
     this.browser = null;
     this.page = null;
+    this.usuario = null;
   }
 
   async init() {
     log('Iniciando browser headless...');
+    const browserPath = path.join(__dirname, '..', 'browser', 'chrome-win64', 'chrome.exe');
     this.browser = await chromium.launch({
       headless: true,
+      executablePath: browserPath,
       args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
     const context = await this.browser.newContext({
@@ -69,6 +76,7 @@ class PlaywrightBot {
   }
 
   async login(usuario, senha) {
+    this.usuario = usuario;
     log('Navegando para login...');
     await this.page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await sleep(3000);
@@ -125,94 +133,84 @@ class PlaywrightBot {
   async selectFromChosen(containerId, searchText) {
     log(`  Chosen: "${searchText}" em #${containerId}`);
 
-    const result = await withTimeout(
-      this.page.evaluate(({ cid, text }) => {
+    const normalizedSearch = normalizar(searchText);
+
+    const resultado = await withTimeout(
+      this.page.evaluate(({ cid, normalizedSearch }) => {
         const container = document.getElementById(cid);
         if (!container) return { ok: false, reason: 'container not found' };
 
-        const single = container.querySelector('.chosen-single');
-        if (!single) return { ok: false, reason: 'chosen-single not found' };
+        const selectId = cid.replace(/_chosen$/, '');
+        const selectEl = document.getElementById(selectId);
+        if (!selectEl) return { ok: false, reason: 'select not found: #' + selectId };
 
-        single.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-        return { ok: true };
-      }, { cid: containerId, text: searchText }),
-      5000, 'selectFromChosen-open'
-    );
+        const options = selectEl.querySelectorAll('option');
+        const allOpts = [];
+        let bestMatch = null;
+        let bestScore = 0;
 
-    if (!result.ok) {
-      log(`    Falhou: ${result.reason}`);
-      return false;
-    }
+        for (const opt of options) {
+          if (!opt.value || opt.value === '') continue;
+          const txt = opt.textContent.trim();
+          const upper = txt.toUpperCase();
+          const normTxt = upper.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          allOpts.push(txt);
 
-    await sleep(500);
+          if (normTxt === normalizedSearch) {
+            bestMatch = opt;
+            bestScore = 100;
+            break;
+          }
 
-    const typeResult = await withTimeout(
-      this.page.evaluate(({ cid, text }) => {
-        const container = document.getElementById(cid);
-        const searchInput = container.querySelector('.chosen-search input');
-        if (!searchInput) return { ok: false, reason: 'search input not found' };
+          if (normTxt.includes(normalizedSearch) || normalizedSearch.includes(normTxt)) {
+            if (bestScore < 50) {
+              bestMatch = opt;
+              bestScore = 50;
+            }
+          }
 
-        searchInput.focus();
-        searchInput.value = text;
-        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-        searchInput.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
-        return { ok: true };
-      }, { cid: containerId, text: searchText }),
-      5000, 'selectFromChosen-type'
-    );
-
-    if (!typeResult.ok) {
-      log(`    Falhou: ${typeResult.reason}`);
-      return false;
-    }
-
-    await sleep(1000);
-
-    const clickResult = await withTimeout(
-      this.page.evaluate(({ cid, text }) => {
-        const container = document.getElementById(cid);
-        const items = container.querySelectorAll('.chosen-results li');
-        const search = text.toUpperCase();
-        let found = null;
-
-        for (let i = 0; i < items.length; i++) {
-          if (items[i].offsetParent === null) continue;
-          const txt = items[i].textContent.trim().toUpperCase();
-          if (txt === search) { found = items[i]; break; }
-          if (txt.indexOf(search) !== -1 || search.indexOf(txt) !== -1) {
-            if (!found) found = items[i];
+          const words = normTxt.split(/[\s\-\/,.]+/).filter(Boolean);
+          for (const w of words) {
+            if (w === normalizedSearch) {
+              if (bestScore < 40) {
+                bestMatch = opt;
+                bestScore = 40;
+              }
+            } else if (w.includes(normalizedSearch) || normalizedSearch.includes(w)) {
+              if (bestScore < 20) {
+                bestMatch = opt;
+                bestScore = 20;
+              }
+            }
           }
         }
 
-        if (!found) {
-          for (let j = 0; j < items.length; j++) {
-            if (items[j].offsetParent !== null) { found = items[j]; break; }
+        if (bestMatch) {
+          selectEl.value = bestMatch.value;
+          selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+          if (typeof $ !== 'undefined' && $(selectEl).trigger) {
+            $(selectEl).trigger('chosen:updated');
           }
-        }
-
-        if (found) {
-          found.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-          found.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-          return { ok: true, text: found.textContent.trim() };
+          return { ok: true, text: bestMatch.textContent.trim() };
         }
 
         return {
           ok: false,
-          reason: 'item not found',
-          available: Array.from(items).filter(i => i.offsetParent !== null).map(i => i.textContent.trim()).slice(0, 10)
+          reason: 'Nenhum resultado para "' + normalizedSearch + '"',
+          available: allOpts.slice(0, 15)
         };
-      }, { cid: containerId, text: searchText }),
-      5000, 'selectFromChosen-click'
+      }, { cid: containerId, normalizedSearch }),
+      5000, 'selectFromChosen-direct'
     );
 
-    if (clickResult.ok) {
-      log(`    OK: "${clickResult.text}"`);
+    if (resultado.ok) {
+      log(`    OK: "${resultado.text}"`);
     } else {
-      log(`    Nao encontrado: ${clickResult.reason}`);
-      if (clickResult.available) log(`    Opcoes: ${clickResult.available.join(' | ')}`);
+      log(`    Nao encontrado: ${resultado.reason}`);
+      if (resultado.available) log(`    Opcoes: ${resultado.available.join(' | ')}`);
     }
 
-    return clickResult.ok;
+    return resultado.ok;
   }
 
   async corrigirAbertura() {
@@ -248,29 +246,45 @@ class PlaywrightBot {
     const empresaOk = await this.selectFromChosen('TicketMlo_Cliente_Codigo_chosen', item.empresa);
     if (!empresaOk) {
       await this.screenshot('erro-empresa');
-      throw new Error('Empresa nao encontrada: ' + item.empresa);
+      try { await this.ensureTicketPage(); } catch (e) {}
+      return { ok: false, erro: 'Empresa nao encontrada: ' + item.empresa };
     }
     await sleep(3000);
 
     if (item.contato) {
       log('Etapa 2: Contato...');
-      await this.selectFromChosen('TicketMlo_OperadorContato_Id_chosen', item.contato);
+      const contatoOk = await this.selectFromChosen('TicketMlo_OperadorContato_Id_chosen', item.contato);
+      if (!contatoOk) {
+        log('    Contato nao encontrado, continuando sem contato...');
+      }
       await sleep(1500);
     }
 
     log('Etapa 3: Sistema...');
-    await this.selectFromChosen('Sistema_chosen', 'SIGA');
+    const sistemaOk = await this.selectFromChosen('Sistema_chosen', 'SIGA');
+    if (!sistemaOk) {
+      await this.screenshot('erro-sistema');
+      try { await this.ensureTicketPage(); } catch (e) {}
+      return { ok: false, erro: 'Sistema nao encontrado: SIGA' };
+    }
     await sleep(2000);
 
     if (item.modulo) {
       log('Etapa 4: Modulo...');
-      await this.selectFromChosen('TicketMlo_Modulo_Id_chosen', item.modulo);
+      const moduloOk = await this.selectFromChosen('TicketMlo_Modulo_Id_chosen', item.modulo);
+      if (!moduloOk) {
+        await this.screenshot('erro-modulo');
+        try { await this.ensureTicketPage(); } catch (e) {}
+        return { ok: false, erro: 'Modulo nao encontrado: ' + item.modulo };
+      }
       await sleep(2000);
     }
 
     log('Etapa 4.5: Selecionando Responsavel (usuario logado)...');
-    const responsavelOk = await this.selectResponsavel();
-    log(`Responsavel: ${responsavelOk ? 'OK' : 'FALHOU'}`);
+    const responsavelOk = await this.selectResponsavel(this.usuario);
+    if (!responsavelOk) {
+      log('Responsavel nao encontrado, continuando...');
+    }
     await sleep(1000);
 
     if (item.titulo) {
@@ -348,7 +362,11 @@ class PlaywrightBot {
     const ticketNum = await this.getTicketNumber();
     log(`Ticket: ${ticketNum || 'NAO CAPTURADO'}`);
 
-    if (item.concluido && ticketNum) {
+    if (!ticketNum) {
+      return { ok: false, erro: 'Nao foi possivel capturar o numero do ticket' };
+    }
+
+    if (item.concluido) {
       try {
         await this.concluirTicket();
       } catch (e) {
@@ -356,68 +374,41 @@ class PlaywrightBot {
       }
     }
 
-    return ticketNum;
+    return { ok: true, ticketNum };
   }
 
-  async selectResponsavel() {
-    const usuarioLogado = await this.page.evaluate(() => {
-      const el = document.querySelector('#TicketMlo_OperadorResponsavel_Id');
-      if (el && el.value) return el.value;
-      const headerUser = document.querySelector('.user-info, .navbar-user, [class*="usuario"]');
-      if (headerUser) return headerUser.textContent.trim();
-      return null;
-    });
-    log(`  Usuario logado (hidden): ${usuarioLogado || 'N/A'}`);
+  async selectResponsavel(usuario) {
+    log(`  Buscando responsavel para: ${usuario}`);
 
-    const responsavelValue = await this.page.evaluate(() => {
-      const hidden = document.querySelector('#TicketMlo_OperadorResponsavel_Id');
-      return hidden ? hidden.value : null;
-    });
+    for (let tentativa = 1; tentativa <= 2; tentativa++) {
+      const responsavelValue = await this.page.evaluate(() => {
+        const el = document.querySelector('#TicketMlo_OperadorResponsavel_Id');
+        return el ? el.value : null;
+      });
 
-    if (responsavelValue) {
-      log(`  Responsavel ja definido: ${responsavelValue}`);
-      return true;
-    }
-
-    const selecionado = await this.page.evaluate(() => {
-      const select = document.querySelector('#Responsavel');
-      if (!select) return { ok: false, reason: '#Responsavel nao encontrado' };
-
-      const operadorId = document.querySelector('#TicketMlo_OperadorResponsavel_Id');
-      if (operadorId && operadorId.value) return { ok: true, value: operadorId.value };
-
-      const options = select.querySelectorAll('option');
-      for (const opt of options) {
-        if (opt.value && opt.value !== '' && opt.value !== 'N2' && opt.value !== 'Produtos' &&
-            opt.value !== 'Desenvolvimento' && opt.value !== 'Outros' && !opt.parentElement.matches('optgroup[label=""]')) {
-          const texto = opt.textContent.trim().toUpperCase();
-          if (texto === 'PEDRO.JORDAO' || texto === 'PEDRO.JORDÃ' || texto.includes('PEDRO.JORDAO')) {
-            select.value = opt.value;
-            operadorId.value = opt.value;
-            select.dispatchEvent(new Event('change', { bubbles: true }));
-            return { ok: true, value: opt.value, texto: opt.textContent.trim() };
-          }
-        }
+      if (responsavelValue) {
+        log(`  Responsavel ja definido: ${responsavelValue}`);
+        return true;
       }
 
-      const loggedHeader = document.querySelector('.user-name, .navbar .dropdown-toggle, [class*="ola"]');
-      let username = '';
-      if (loggedHeader) {
-        const match = loggedHeader.textContent.match(/Ol[áa],?\s*(\S+)/i);
-        if (match) username = match[1].toUpperCase();
-      }
-      if (!username) {
-        const allText = document.body.innerText;
-        const m = allText.match(/Ol[áa],?\s*(\S+)/i);
-        if (m) username = m[1].toUpperCase();
-      }
+      const username = (usuario || this.usuario || '').toUpperCase().trim();
+      log(`  Username para buscar: ${username} (tentativa ${tentativa})`);
 
-      if (username) {
-        for (const opt of options) {
-          if (opt.value && opt.value !== '' && opt.value !== 'N2' && opt.value !== 'Produtos' &&
-              opt.value !== 'Desenvolvimento' && opt.value !== 'Outros') {
+      const selecionado = await this.page.evaluate((searchName) => {
+        const select = document.querySelector('#Responsavel');
+        if (!select) return { ok: false, reason: '#Responsavel nao encontrado' };
+
+        const operadorId = document.querySelector('#TicketMlo_OperadorResponsavel_Id');
+        if (operadorId && operadorId.value) return { ok: true, value: operadorId.value };
+
+        const options = select.querySelectorAll('option');
+
+        if (searchName) {
+          for (const opt of options) {
+            if (!opt.value || opt.value === '') continue;
+            if (opt.parentElement.matches('optgroup[label=""]')) continue;
             const texto = opt.textContent.trim().toUpperCase();
-            if (texto === username || texto.includes(username)) {
+            if (texto === searchName || texto.includes(searchName) || searchName.includes(texto)) {
               select.value = opt.value;
               operadorId.value = opt.value;
               select.dispatchEvent(new Event('change', { bubbles: true }));
@@ -425,23 +416,22 @@ class PlaywrightBot {
             }
           }
         }
+
+        return { ok: false, reason: 'nenhum operador encontrado' };
+      }, username);
+
+      log(`  Resultado tentativa ${tentativa}: ${JSON.stringify(selecionado)}`);
+
+      if (selecionado.ok) return true;
+
+      if (tentativa < 2) {
+        log(`  Aguardando 2s para retry...`);
+        await sleep(2000);
       }
+    }
 
-      for (const opt of options) {
-        if (opt.value && opt.value !== '' && opt.value !== 'N2' && opt.value !== 'Produtos' &&
-            opt.value !== 'Desenvolvimento' && opt.value !== 'Outros') {
-          select.value = opt.value;
-          operadorId.value = opt.value;
-          select.dispatchEvent(new Event('change', { bubbles: true }));
-          return { ok: true, value: opt.value, texto: opt.textContent.trim() };
-        }
-      }
-
-      return { ok: false, reason: 'nenhum operador encontrado' };
-    });
-
-    log(`  Resultado: ${JSON.stringify(selecionado)}`);
-    return selecionado.ok;
+    log(`  Responsavel nao encontrado apos 2 tentativas, continuando sem responsavel.`);
+    return false;
   }
 
   async concluirTicket() {

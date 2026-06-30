@@ -3,3 +3,6 @@ db/*.db
 db/*.png
 referencias/*.png
 referencias/*.jpg
+browser/
+out/
+dist/

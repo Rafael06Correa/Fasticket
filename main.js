@@ -27,6 +27,7 @@ function createWindow() {
     minHeight: 600,
     frame: false,
     backgroundColor: '#0f172a',
+    icon: path.join(__dirname, 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -78,6 +79,10 @@ ipcMain.handle('historico:add', async (event, entry) => {
   }
 });
 
+ipcMain.handle('historico:clear', async () => {
+  await db.historico.remove({}, { multi: true });
+});
+
 ipcMain.handle('credenciais:get', async () => {
   const creds = await db.credenciais.findOne({});
   return creds || { usuario: '', senha: '' };
@@ -119,12 +124,15 @@ ipcMain.handle('fila:processar', async (event, itens) => {
     for (let i = 0; i < itens.length; i++) {
       const item = itens[i];
       logMain(`Processando item ${i + 1}/${itens.length}: ${item.empresa}`);
+      let parar = false;
+
       try {
-        const ticketNum = await bot.processarItem(item);
-        logMain(`Item ${i + 1} resultado: ticket=${ticketNum}`);
-        if (ticketNum) {
+        const resultado = await bot.processarItem(item);
+        logMain(`Item ${i + 1} resultado: ${JSON.stringify(resultado)}`);
+
+        if (resultado.ok) {
           await db.historico.insert({
-            numero: String(ticketNum),
+            numero: String(resultado.ticketNum),
             empresa: item.empresaNome || item.empresa,
             criadoEm: new Date().toISOString()
           });
@@ -139,25 +147,27 @@ ipcMain.handle('fila:processar', async (event, itens) => {
           idsProcessados.push(item._id);
           mainWindow.webContents.send('fila:item-concluido', {
             item,
-            ticketNum,
+            ticketNum: resultado.ticketNum,
             sucesso: true
           });
           try {
             await bot.ensureTicketPage();
           } catch (e) {
             logMain('Falha ao voltar para pagina de criacao: ' + e.message);
+            parar = true;
           }
         } else {
           mainWindow.webContents.send('fila:item-concluido', {
             item,
             ticketNum: null,
             sucesso: false,
-            erro: 'Nao foi possivel capturar o numero do ticket'
+            erro: resultado.erro || 'Erro desconhecido'
           });
           try {
             await bot.ensureTicketPage();
           } catch (e) {
             logMain('Falha ao voltar para pagina de criacao: ' + e.message);
+            parar = true;
           }
         }
       } catch (err) {
@@ -172,7 +182,13 @@ ipcMain.handle('fila:processar', async (event, itens) => {
           await bot.ensureTicketPage();
         } catch (e) {
           logMain('Falha ao voltar para pagina de criacao: ' + e.message);
+          parar = true;
         }
+      }
+
+      if (parar) {
+        logMain('Nao foi possivel voltar para pagina de criacao. Parando processamento.');
+        break;
       }
     }
 
