@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const Datastore = require('nedb-promises');
+const logger = require('./bot/logger');
 
 const PORTAL_URL = 'https://portaldocliente.praxio.com.br';
 const TICKET_URL = PORTAL_URL + '/Ticket/NovoTicketAnalista';
@@ -50,7 +51,7 @@ ipcMain.handle('fila:add', async (event, rascunho) => {
 
 ipcMain.handle('fila:update', async (event, id, updates) => {
   await db.fila.update({ _id: id }, { $set: updates });
-  await db.fila.persistence.compactDatafile();
+  await db.fila.compactDatafile();
   return await db.fila.findOne({ _id: id });
 });
 
@@ -65,18 +66,11 @@ ipcMain.handle('fila:removeByIds', async (event, ids) => {
 });
 
 ipcMain.handle('historico:get', async () => {
-  return await db.historico.find({}).sort({ criadoEm: -1 }).limit(5);
+  return await db.historico.find({}).sort({ criadoEm: -1 });
 });
 
 ipcMain.handle('historico:add', async (event, entry) => {
   await db.historico.insert(entry);
-  const count = await db.historico.count({});
-  if (count > 5) {
-    const all = await db.historico.find({}).sort({ criadoEm: -1 });
-    for (const old of all.slice(5)) {
-      await db.historico.remove({ _id: old._id });
-    }
-  }
 });
 
 ipcMain.handle('historico:clear', async () => {
@@ -96,13 +90,7 @@ ipcMain.handle('credenciais:save', async (event, cred) => {
 // Processamento - NAO remove da fila antes, so remove apos sucesso
 let isProcessing = false;
 
-function logMain(msg) {
-  const ts = new Date().toLocaleTimeString('pt-BR');
-  console.log(`[MAIN ${ts}] ${msg}`);
-}
-
 ipcMain.handle('fila:processar', async (event, itens) => {
-  logMain(`fila:processar chamado com ${itens.length} item(s)`);
   if (isProcessing) return { error: 'Ja existe processamento em andamento' };
   isProcessing = true;
   mainWindow.webContents.send('fila:status', { processando: true });
@@ -118,17 +106,56 @@ ipcMain.handle('fila:processar', async (event, itens) => {
       throw new Error('Credenciais nao configuradas');
     }
 
-    await bot.init();
-    await bot.login(creds.usuario, creds.senha);
+    // Função para inicializar e logar
+    async function initBot() {
+      await bot.init();
+      await bot.login(creds.usuario, creds.senha);
+    }
+
+    await initBot();
+    logger.startAutomation();
 
     for (let i = 0; i < itens.length; i++) {
       const item = itens[i];
-      logMain(`Processando item ${i + 1}/${itens.length}: ${item.empresa}`);
-      let parar = false;
+
+      // Notificar início do processamento do item
+      mainWindow.webContents.send('fila:item-iniciando', {
+        item,
+        index: i + 1,
+        total: itens.length
+      });
+
+      // Validar dados obrigatórios antes de iniciar
+      const camposObrigatorios = {
+        empresa: 'Empresa',
+        contato: 'Contato',
+        modulo: 'Módulo',
+        titulo: 'Título',
+        descricao: 'Descrição'
+      };
+      const camposFaltando = [];
+      for (const [campo, label] of Object.entries(camposObrigatorios)) {
+        if (!item[campo] || item[campo].trim() === '') {
+          camposFaltando.push(label);
+        }
+      }
+
+      if (camposFaltando.length > 0) {
+        const erroMsg = `Campos obrigatórios faltando: ${camposFaltando.join(', ')}`;
+        mainWindow.webContents.send('fila:item-concluido', {
+          item,
+          ticketNum: null,
+          sucesso: false,
+          erro: erroMsg
+        });
+        logger.skip(erroMsg);
+        continue;
+      }
+
+      logger.startTicket(i + 1, itens.length, item);
 
       try {
         const resultado = await bot.processarItem(item);
-        logMain(`Item ${i + 1} resultado: ${JSON.stringify(resultado)}`);
 
         if (resultado.ok) {
           await db.historico.insert({
@@ -136,13 +163,6 @@ ipcMain.handle('fila:processar', async (event, itens) => {
             empresa: item.empresaNome || item.empresa,
             criadoEm: new Date().toISOString()
           });
-          const count = await db.historico.count({});
-          if (count > 5) {
-            const all = await db.historico.find({}).sort({ criadoEm: -1 });
-            for (const old of all.slice(5)) {
-              await db.historico.remove({ _id: old._id });
-            }
-          }
           await db.fila.remove({ _id: item._id });
           idsProcessados.push(item._id);
           mainWindow.webContents.send('fila:item-concluido', {
@@ -150,11 +170,22 @@ ipcMain.handle('fila:processar', async (event, itens) => {
             ticketNum: resultado.ticketNum,
             sucesso: true
           });
+          logger.result(true, resultado.ticketNum);
+
+          // Tentar voltar para página de criação
           try {
             await bot.ensureTicketPage();
           } catch (e) {
-            logMain('Falha ao voltar para pagina de criacao: ' + e.message);
-            parar = true;
+            // Falha ao voltar — tentar refazer login
+            logger.info('Falha ao voltar para criação, tentando refazer login...');
+            try {
+              await bot.close();
+              await initBot();
+              logger.info('Login refazido com sucesso.');
+            } catch (loginErr) {
+              logger.error('Falha ao refazer login: ' + loginErr.message);
+              break;
+            }
           }
         } else {
           mainWindow.webContents.send('fila:item-concluido', {
@@ -163,39 +194,54 @@ ipcMain.handle('fila:processar', async (event, itens) => {
             sucesso: false,
             erro: resultado.erro || 'Erro desconhecido'
           });
+          logger.result(false, null, resultado.erro || 'Erro desconhecido');
+
+          // Tentar voltar para página de criação
           try {
             await bot.ensureTicketPage();
           } catch (e) {
-            logMain('Falha ao voltar para pagina de criacao: ' + e.message);
-            parar = true;
+            // Falha ao voltar — tentar refazer login
+            logger.info('Falha ao voltar para criação, tentando refazer login...');
+            try {
+              await bot.close();
+              await initBot();
+              logger.info('Login refazido com sucesso.');
+            } catch (loginErr) {
+              logger.error('Falha ao refazer login: ' + loginErr.message);
+              break;
+            }
           }
         }
       } catch (err) {
-        logMain(`Erro no item ${i + 1}: ${err.message}`);
         mainWindow.webContents.send('fila:item-concluido', {
           item,
           ticketNum: null,
           sucesso: false,
           erro: err.message
         });
+        logger.result(false, null, err.message);
+
+        // Tentar voltar para página de criação
         try {
           await bot.ensureTicketPage();
         } catch (e) {
-          logMain('Falha ao voltar para pagina de criacao: ' + e.message);
-          parar = true;
+          // Falha ao voltar — tentar refazer login
+          logger.info('Falha ao voltar para criação, tentando refazer login...');
+          try {
+            await bot.close();
+            await initBot();
+            logger.info('Login refazido com sucesso.');
+          } catch (loginErr) {
+            logger.error('Falha ao refazer login: ' + loginErr.message);
+            break;
+          }
         }
-      }
-
-      if (parar) {
-        logMain('Nao foi possivel voltar para pagina de criacao. Parando processamento.');
-        break;
       }
     }
 
     await bot.close();
-    logMain('Processamento concluido.');
   } catch (err) {
-    logMain('Erro geral: ' + err.message);
+    logger.error(err.message);
   } finally {
     isProcessing = false;
     mainWindow.webContents.send('fila:status', { processando: false });

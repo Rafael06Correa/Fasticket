@@ -1,14 +1,10 @@
 const { chromium } = require('playwright-core');
 const path = require('path');
+const logger = require('./logger');
 
 const PORTAL_URL = 'https://portaldocliente.praxio.com.br';
 const TICKET_URL = PORTAL_URL + '/Ticket/NovoTicketAnalista';
 const LOGIN_URL = PORTAL_URL + '/Home/Index';
-
-function log(msg) {
-  const ts = new Date().toLocaleTimeString('pt-BR');
-  console.log(`[BOT ${ts}] ${msg}`);
-}
 
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
@@ -35,7 +31,6 @@ class PlaywrightBot {
   }
 
   async init() {
-    log('Iniciando browser headless...');
     const browserPath = path.join(__dirname, '..', 'browser', 'chrome-win64', 'chrome.exe');
     this.browser = await chromium.launch({
       headless: true,
@@ -50,34 +45,19 @@ class PlaywrightBot {
     this.page = await context.newPage();
 
     this.page.on('console', msg => {
-      if (msg.type() === 'error') log('[PAGE ERROR] ' + msg.text());
+      if (msg.type() === 'error') logger.pageError(msg.text());
     });
-    this.page.on('pageerror', err => log('[PAGE EXCEPTION] ' + err.message));
-
-    log('Browser iniciado.');
+    this.page.on('pageerror', err => logger.pageError(err.message));
   }
 
   async close() {
     if (this.browser) {
       await this.browser.close();
-      log('Browser fechado.');
-    }
-  }
-
-  async screenshot(name) {
-    try {
-      const dir = path.join(__dirname, '..', 'db');
-      const file = path.join(dir, `${name}.png`);
-      await this.page.screenshot({ path: file, fullPage: true });
-      log(`Screenshot: ${file}`);
-    } catch (e) {
-      log('Erro screenshot: ' + e.message);
     }
   }
 
   async login(usuario, senha) {
     this.usuario = usuario;
-    log('Navegando para login...');
     await this.page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await sleep(3000);
 
@@ -86,7 +66,6 @@ class PlaywrightBot {
     const btnEntrar = await this.page.$('#btnEntrar');
 
     if (!loginField || !passField || !btnEntrar) {
-      await this.screenshot('login-erro');
       throw new Error('Campos de login nao encontrados');
     }
 
@@ -95,7 +74,6 @@ class PlaywrightBot {
     await passField.fill(senha);
     await sleep(300);
 
-    log('Clicando Entrar...');
     await Promise.all([
       this.page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {}),
       btnEntrar.click()
@@ -103,21 +81,19 @@ class PlaywrightBot {
     await sleep(3000);
 
     if (this.page.url().includes('/Home/Index')) {
-      await this.screenshot('login-falhou');
       throw new Error('Login falhou - credenciais invalidas');
     }
 
-    log('Login OK, indo para ticket...');
+    logger.loginSuccess();
     await this.page.goto(TICKET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await sleep(4000);
 
     const pageType = await this.detectPage();
     if (pageType === 'login') {
-      await this.screenshot('sessao-expirada');
       throw new Error('Sessao expirada');
     }
 
-    log('Pronto para processar tickets.');
+    logger.systemReady();
   }
 
   async detectPage() {
@@ -131,8 +107,6 @@ class PlaywrightBot {
   }
 
   async selectFromChosen(containerId, searchText) {
-    log(`  Chosen: "${searchText}" em #${containerId}`);
-
     const normalizedSearch = normalizar(searchText);
 
     const resultado = await withTimeout(
@@ -146,8 +120,8 @@ class PlaywrightBot {
 
         const options = selectEl.querySelectorAll('option');
         const allOpts = [];
-        let bestMatch = null;
-        let bestScore = 0;
+        let exactMatch = null;
+        let startsWithMatch = null;
 
         for (const opt of options) {
           if (!opt.value || opt.value === '') continue;
@@ -156,34 +130,20 @@ class PlaywrightBot {
           const normTxt = upper.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
           allOpts.push(txt);
 
+          // Match exato (100% confiança)
           if (normTxt === normalizedSearch) {
-            bestMatch = opt;
-            bestScore = 100;
+            exactMatch = opt;
             break;
           }
 
-          if (normTxt.includes(normalizedSearch) || normalizedSearch.includes(normTxt)) {
-            if (bestScore < 50) {
-              bestMatch = opt;
-              bestScore = 50;
-            }
-          }
-
-          const words = normTxt.split(/[\s\-\/,.]+/).filter(Boolean);
-          for (const w of words) {
-            if (w === normalizedSearch) {
-              if (bestScore < 40) {
-                bestMatch = opt;
-                bestScore = 40;
-              }
-            } else if (w.includes(normalizedSearch) || normalizedSearch.includes(w)) {
-              if (bestScore < 20) {
-                bestMatch = opt;
-                bestScore = 20;
-              }
-            }
+          // Match no início do texto (ex: "LOCAFAST" em "LOCAFAST LTDA")
+          if (!startsWithMatch && normTxt.startsWith(normalizedSearch)) {
+            startsWithMatch = opt;
           }
         }
+
+        // Priorizar match exato, senão usar startsWith
+        const bestMatch = exactMatch || startsWithMatch;
 
         if (bestMatch) {
           selectEl.value = bestMatch.value;
@@ -191,7 +151,11 @@ class PlaywrightBot {
           if (typeof $ !== 'undefined' && $(selectEl).trigger) {
             $(selectEl).trigger('chosen:updated');
           }
-          return { ok: true, text: bestMatch.textContent.trim() };
+          return {
+            ok: true,
+            text: bestMatch.textContent.trim(),
+            exact: !!exactMatch
+          };
         }
 
         return {
@@ -203,18 +167,10 @@ class PlaywrightBot {
       5000, 'selectFromChosen-direct'
     );
 
-    if (resultado.ok) {
-      log(`    OK: "${resultado.text}"`);
-    } else {
-      log(`    Nao encontrado: ${resultado.reason}`);
-      if (resultado.available) log(`    Opcoes: ${resultado.available.join(' | ')}`);
-    }
-
-    return resultado.ok;
+    return resultado;
   }
 
   async corrigirAbertura() {
-    log('  Corrigindo campo Abertura...');
     const corrigido = await this.page.evaluate(() => {
       const abertura = document.querySelector('#TicketMlo_DataAbertura') ||
                        document.querySelector('[name*="Abertura"]') ||
@@ -231,64 +187,67 @@ class PlaywrightBot {
 
       return { ok: true, value: dataAtual };
     });
-    log(`  Abertura: ${corrigido.ok ? corrigido.value : corrigido.reason}`);
-    return corrigido.ok;
+    return corrigido;
   }
 
   async processarItem(item) {
-    log('=== Item ===');
-    log(`Empresa: ${item.empresa} | Contato: ${item.contato} | Modulo: ${item.modulo}`);
-
     await this.ensureTicketPage();
     await sleep(1500);
 
-    log('Etapa 1: Empresa...');
-    const empresaOk = await this.selectFromChosen('TicketMlo_Cliente_Codigo_chosen', item.empresa);
-    if (!empresaOk) {
-      await this.screenshot('erro-empresa');
+    // 1. Selecionar empresa
+    const empresaResult = await this.selectFromChosen('TicketMlo_Cliente_Codigo_chosen', item.empresa);
+    if (!empresaResult.ok) {
+      logger.step('Selecionando empresa', false, empresaResult.reason);
       try { await this.ensureTicketPage(); } catch (e) {}
-      return { ok: false, erro: 'Empresa nao encontrada: ' + item.empresa };
+      return { ok: false, erro: 'Empresa não encontrada: ' + item.empresa };
     }
+    const empresaInfo = empresaResult.exact ? null : `Encontrado: "${empresaResult.text}" (busca: "${item.empresa}")`;
+    logger.step('Selecionando empresa', true, empresaInfo);
     await sleep(3000);
 
+    // 2. Selecionar contato
     if (item.contato) {
-      log('Etapa 2: Contato...');
-      const contatoOk = await this.selectFromChosen('TicketMlo_OperadorContato_Id_chosen', item.contato);
-      if (!contatoOk) {
-        log('    Contato nao encontrado, continuando sem contato...');
+      const contatoResult = await this.selectFromChosen('TicketMlo_OperadorContato_Id_chosen', item.contato);
+      if (!contatoResult.ok) {
+        logger.step('Selecionando contato', false, 'Contato não encontrado');
+      } else {
+        const contatoInfo = contatoResult.exact ? null : `Encontrado: "${contatoResult.text}" (busca: "${item.contato}")`;
+        logger.step('Selecionando contato', true, contatoInfo);
       }
       await sleep(1500);
     }
 
-    log('Etapa 3: Sistema...');
-    const sistemaOk = await this.selectFromChosen('Sistema_chosen', 'SIGA');
-    if (!sistemaOk) {
-      await this.screenshot('erro-sistema');
+    // 3. Selecionar sistema
+    const sistemaResult = await this.selectFromChosen('Sistema_chosen', 'SIGA');
+    if (!sistemaResult.ok) {
+      logger.step('Selecionando sistema', false, sistemaResult.reason);
       try { await this.ensureTicketPage(); } catch (e) {}
-      return { ok: false, erro: 'Sistema nao encontrado: SIGA' };
+      return { ok: false, erro: 'Sistema não encontrado: SIGA' };
     }
+    const sistemaInfo = sistemaResult.exact ? null : `Encontrado: "${sistemaResult.text}" (busca: "SIGA")`;
+    logger.step('Selecionando sistema', true, sistemaInfo);
     await sleep(2000);
 
+    // 4. Selecionar módulo
     if (item.modulo) {
-      log('Etapa 4: Modulo...');
-      const moduloOk = await this.selectFromChosen('TicketMlo_Modulo_Id_chosen', item.modulo);
-      if (!moduloOk) {
-        await this.screenshot('erro-modulo');
+      const moduloResult = await this.selectFromChosen('TicketMlo_Modulo_Id_chosen', item.modulo);
+      if (!moduloResult.ok) {
+        logger.step('Selecionando módulo', false, moduloResult.reason);
         try { await this.ensureTicketPage(); } catch (e) {}
-        return { ok: false, erro: 'Modulo nao encontrado: ' + item.modulo };
+        return { ok: false, erro: 'Módulo não encontrado: ' + item.modulo };
       }
+      const moduloInfo = moduloResult.exact ? null : `Encontrado: "${moduloResult.text}" (busca: "${item.modulo}")`;
+      logger.step('Selecionando módulo', true, moduloInfo);
       await sleep(2000);
     }
 
-    log('Etapa 4.5: Selecionando Responsavel (usuario logado)...');
+    // 5. Definir responsável
     const responsavelOk = await this.selectResponsavel(this.usuario);
-    if (!responsavelOk) {
-      log('Responsavel nao encontrado, continuando...');
-    }
+    logger.step('Definindo responsável', responsavelOk, responsavelOk ? null : 'Responsável não encontrado');
     await sleep(1000);
 
+    // 6. Preencher informações
     if (item.titulo) {
-      log('Etapa 5: Assunto...');
       await withTimeout(
         this.page.evaluate((text) => {
           const el = document.querySelector('#TicketMlo_Assunto');
@@ -302,31 +261,28 @@ class PlaywrightBot {
       );
     }
 
-    if (item.descricao) {
-      log('Etapa 6: Descricao...');
-      await withTimeout(
-        this.page.evaluate((text) => {
-          const editor = document.querySelector('#EditorDescricao');
-          if (!editor) return false;
-          editor.focus();
-          document.execCommand('selectAll', false, null);
-          document.execCommand('delete', false, null);
-          document.execCommand('insertText', false, text);
+    const textoChamado = 'Chamado telefônico';
+    await withTimeout(
+      this.page.evaluate((text) => {
+        const editor = document.querySelector('#EditorDescricao');
+        if (!editor) return false;
+        editor.focus();
+        document.execCommand('selectAll', false, null);
+        document.execCommand('delete', false, null);
+        document.execCommand('insertText', false, text);
 
-          const hidden = document.querySelector('#TramiteMlo_Descricao');
-          if (hidden) hidden.value = text;
-          return true;
-        }, item.descricao),
-        10000, 'preencher-descricao'
-      );
-    }
+        const hidden = document.querySelector('#TramiteMlo_Descricao');
+        if (hidden) hidden.value = text;
+        return true;
+      }, textoChamado),
+      10000, 'preencher-descricao'
+    );
 
-    await this.corrigirAbertura();
+    const aberturaResult = await this.corrigirAbertura();
+    logger.step('Preenchendo informações', aberturaResult.ok, aberturaResult.ok ? null : 'Erro ao preencher abertura');
     await sleep(500);
 
-    log('Etapa 7: Gravar...');
-    await this.screenshot('antes-gravar');
-
+    // 7. Salvar chamado
     const gravou = await this.page.evaluate(() => {
       const btn = document.querySelector('#btnGravar');
       if (!btn) return false;
@@ -338,17 +294,12 @@ class PlaywrightBot {
       throw new Error('Botao Gravar nao encontrado');
     }
 
-    log('Aguardando redirect...');
     try {
       await this.page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 });
     } catch (e) {
-      log('Nao houve redirect, verificando URL...');
+      // Não houve redirect
     }
     await sleep(3000);
-
-    const urlAtual = this.page.url();
-    log('URL apos gravar: ' + urlAtual);
-    await this.screenshot('pos-gravar');
 
     const erros = await this.page.evaluate(() => {
       const errosEl = document.querySelectorAll('.validation-summary-errors li, .alert-danger, .field-validation-error');
@@ -356,30 +307,51 @@ class PlaywrightBot {
     });
 
     if (erros.length > 0) {
-      log('Erros de validacao: ' + erros.join(' | '));
+      logger.step('Salvando chamado', false, 'Erros de validação: ' + erros.join(' | '));
+      return { ok: false, erro: erros.join(' | ') };
     }
 
     const ticketNum = await this.getTicketNumber();
-    log(`Ticket: ${ticketNum || 'NAO CAPTURADO'}`);
-
     if (!ticketNum) {
+      logger.step('Salvando chamado', false, 'Não foi possível capturar o número do ticket');
       return { ok: false, erro: 'Nao foi possivel capturar o numero do ticket' };
     }
 
+    logger.step('Salvando chamado', true);
+    logger.ticketGenerated(ticketNum);
+
+    // 8. Inserir descrição
+    if (item.descricao) {
+      await sleep(3000);
+      await this.inserirTramite(item.descricao);
+      logger.step('Inserindo descrição', true);
+    }
+
+    // 9. Definir prioridade
+    await this.preencherNaturezaPrioridade();
+    logger.step('Definindo prioridade', true);
+
+    // 10. Enviar para atendimento
+    await this.enviarTramite('Em andamento');
+    logger.step('Enviando para atendimento', true);
+
     if (item.concluido) {
-      try {
-        await this.concluirTicket();
-      } catch (e) {
-        log('Erro na conclusao: ' + e.message);
-      }
+      await sleep(3000);
+      const textoConclusao = `Olá.
+
+Estamos concluindo o atendimento.
+Em caso de necessidade, salientamos que esse ticket pode ser reaberto em até 5 dias ou um novo ticket pode ser aberto a qualquer instante.
+
+A sua satisfação é o nosso maior objetivo! Agradecemos se puder avaliar o nosso atendimento e também a solução dada para a sua demanda.
+:)`;
+      await this.inserirTramite(textoConclusao);
+      await this.enviarTramite('Concluido');
     }
 
     return { ok: true, ticketNum };
   }
 
   async selectResponsavel(usuario) {
-    log(`  Buscando responsavel para: ${usuario}`);
-
     for (let tentativa = 1; tentativa <= 2; tentativa++) {
       const responsavelValue = await this.page.evaluate(() => {
         const el = document.querySelector('#TicketMlo_OperadorResponsavel_Id');
@@ -387,12 +359,10 @@ class PlaywrightBot {
       });
 
       if (responsavelValue) {
-        log(`  Responsavel ja definido: ${responsavelValue}`);
         return true;
       }
 
       const username = (usuario || this.usuario || '').toUpperCase().trim();
-      log(`  Username para buscar: ${username} (tentativa ${tentativa})`);
 
       const selecionado = await this.page.evaluate((searchName) => {
         const select = document.querySelector('#Responsavel');
@@ -420,51 +390,17 @@ class PlaywrightBot {
         return { ok: false, reason: 'nenhum operador encontrado' };
       }, username);
 
-      log(`  Resultado tentativa ${tentativa}: ${JSON.stringify(selecionado)}`);
-
       if (selecionado.ok) return true;
 
       if (tentativa < 2) {
-        log(`  Aguardando 2s para retry...`);
         await sleep(2000);
       }
     }
 
-    log(`  Responsavel nao encontrado apos 2 tentativas, continuando sem responsavel.`);
     return false;
   }
 
-  async concluirTicket() {
-    log('=== CONCLUSAO ===');
-
-    await sleep(2000);
-
-    log('Etapa C1: Preenchendo tramite de fechamento...');
-    const textoTramite = `Olá.
-
-Estamos concluindo o atendimento.
-Em caso de necessidade, salientamos que esse ticket pode ser reaberto em até 5 dias ou um novo ticket pode ser aberto a qualquer instante.
-
-A sua satisfação é o nosso maior objetivo! Agradecemos se puder avaliar o nosso atendimento e também a solução dada para a sua demanda.
-:)`;
-
-    const htmlTramite = '<div>' + textoTramite.replace(/\n/g, '</div><div>') + '</div>';
-
-    await withTimeout(
-      this.page.evaluate((html) => {
-        const editor = document.querySelector('#EditorTramite');
-        if (editor) {
-          editor.focus();
-          editor.innerHTML = html;
-          editor.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-        const hiddenDesc = document.querySelector('#TramiteMlo_Descricao');
-        if (hiddenDesc) hiddenDesc.value = html;
-      }, htmlTramite),
-      10000, 'preencher-editor-tramite'
-    );
-
-    log('Etapa C2: Selecionando Natureza (Ajuda)...');
+  async preencherNaturezaPrioridade() {
     await this.page.evaluate(() => {
       const btn = document.querySelector('#btnOpcoesNatureza');
       if (btn) btn.click();
@@ -483,13 +419,6 @@ A sua satisfação é o nosso maior objetivo! Agradecemos se puder avaliar o nos
     });
     await sleep(800);
 
-    const naturezaOk = await this.page.evaluate(() => {
-      const val = document.querySelector('#TicketMlo_TicketDetalhes_Natureza');
-      return val ? val.value : 'NAO';
-    });
-    log(`Natureza hidden value: ${naturezaOk}`);
-
-    log('Etapa C3: Selecionando Prioridade (Baixa)...');
     await this.page.evaluate(() => {
       const btn = document.querySelector('#btnOpcoesPrioridade');
       if (btn) btn.click();
@@ -507,54 +436,47 @@ A sua satisfação é o nosso maior objetivo! Agradecemos se puder avaliar o nos
       }
     });
     await sleep(800);
+  }
 
-    const prioridadeOk = await this.page.evaluate(() => {
-      const val = document.querySelector('#TicketMlo_TicketDetalhes_Prioridade');
-      return val ? val.value : 'NAO';
-    });
-    log(`Prioridade hidden value: ${prioridadeOk}`);
+  async enviarTramite(statusTexto) {
+    const statusMap = {
+      'Em andamento': '1',
+      'Concluido': '7',
+      'Concluído': '7'
+    };
 
-    log('Etapa C4: Definindo status Concluido...');
-    await this.page.evaluate(() => {
+    const statusVal = statusMap[statusTexto] || '1';
+
+    await this.page.evaluate((val) => {
       const s = document.querySelector('#TicketMlo_Status');
       if (s) {
-        s.value = '7';
+        s.value = val;
         if (typeof $ !== 'undefined') $(s).trigger('chosen:updated');
       }
-    });
+    }, statusVal);
     await sleep(500);
 
-    log('Etapa C5: Selecionando CONCLUIDO no dropdown do btnEnviar...');
     await this.page.evaluate(() => {
       const btn = document.querySelector('#btnListaStatus');
       if (btn) btn.click();
     });
     await sleep(1000);
 
-    await this.page.evaluate(() => {
+    const itemId = statusVal;
+    await this.page.evaluate((id) => {
       const itens = document.querySelectorAll('#listaStatus a.itemStatus');
       for (const item of itens) {
-        if (item.id === '7') { item.click(); break; }
+        if (item.id === id) { item.click(); break; }
       }
-    });
+    }, itemId);
     await sleep(500);
 
-    const btnTexto = await this.page.evaluate(() => {
-      const b = document.querySelector('#btnEnviar');
-      return b ? b.textContent.trim() : 'NAO';
-    });
-    log(`btnEnviar texto: ${btnTexto}`);
-    await this.screenshot('antes-enviar-conclusao');
-
-    log('Etapa C6: Clicando btnEnviar...');
     await this.page.evaluate(() => {
       const btn = document.querySelector('#btnEnviar');
       if (btn) btn.click();
     });
     await sleep(3000);
-    await this.screenshot('pos-enviar-conclusao');
 
-    log('Etapa C7: Procurando dialog de confirmacao...');
     let encontrouDialog = await this.page.evaluate(() => {
       const botoes = document.querySelectorAll('button[data-bb-handler="confirm"]');
       for (const b of botoes) {
@@ -574,11 +496,7 @@ A sua satisfação é o nosso maior objetivo! Agradecemos se puder avaliar o nos
       return { ok: false };
     });
 
-    if (encontrouDialog.ok) {
-      log(`Dialog confirmado: "${encontrouDialog.texto}"`);
-      await sleep(4000);
-    } else {
-      log('Dialog nao encontrado, tentando via formulario...');
+    if (!encontrouDialog.ok) {
       await this.page.evaluate(() => {
         const form = document.querySelector('#frmTicketPrincipal');
         if (form) {
@@ -589,19 +507,32 @@ A sua satisfação é o nosso maior objetivo! Agradecemos se puder avaliar o nos
       });
       await sleep(4000);
     }
+  }
 
-    await this.screenshot('final-conclusao');
-    log('Conclusao finalizada.');
+  async inserirTramite(texto) {
+    const htmlTramite = '<div>' + texto.replace(/\n/g, '</div><div>') + '</div>';
+
+    await withTimeout(
+      this.page.evaluate((html) => {
+        const editor = document.querySelector('#EditorTramite');
+        if (editor) {
+          editor.focus();
+          editor.innerHTML = html;
+          editor.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        const hiddenDesc = document.querySelector('#TramiteMlo_Descricao');
+        if (hiddenDesc) hiddenDesc.value = html;
+      }, htmlTramite),
+      10000, 'preencher-editor-tramite'
+    );
   }
 
   async ensureTicketPage() {
     const page = await this.detectPage();
-    log('Pagina detectada: ' + page);
 
     if (page === 'login') throw new Error('Sessao expirada');
 
     if (page === 'detalhes') {
-      log('Na pagina de detalhes, clicando em Novo Ticket...');
       const clicked = await this.page.evaluate(() => {
         const links = document.querySelectorAll('a, button, span, li');
         for (const el of links) {
@@ -621,16 +552,13 @@ A sua satisfação é o nosso maior objetivo! Agradecemos se puder avaliar o nos
 
       if (clicked) {
         await sleep(4000);
-        log('Navegou para criacao de ticket');
       } else {
-        log('Nao encontrou botao Novo Ticket, navegando via URL...');
         await this.page.goto(TICKET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
         await sleep(4000);
       }
     }
 
     if (page === 'criacao') {
-      log('Ja na pagina de criacao');
       return;
     }
 
