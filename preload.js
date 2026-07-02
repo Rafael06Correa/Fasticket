@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('api', {
     removeByIds: (ids) => ipcRenderer.invoke('fila:removeByIds', ids),
     processar: (itens) => ipcRenderer.invoke('fila:processar', itens),
     onStatus: (cb) => ipcRenderer.on('fila:status', (e, data) => cb(data)),
+    onItemIniciando: (cb) => ipcRenderer.on('fila:item-iniciando', (e, data) => cb(data)),
     onItemConcluido: (cb) => ipcRenderer.on('fila:item-concluido', (e, data) => cb(data))
   },
   historico: {

@@ -628,6 +628,20 @@ body {
   gap: 6px;
 }
 
+.card-erro {
+  border-left-color: #f59e0b !important;
+}
+
+.rascunho-erro {
+  font-size: 11px;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
 /* ========== HISTORICO ========== */
 .historico-card {
   background: #1e293b;
@@ -811,4 +825,72 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #64748b;
+}
+
+/* ========== MANUAL ========== */
+.manual-content {
+  background: #1e293b;
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.15);
+  border: 1px solid #334155;
+}
+
+.manual-content h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #334155;
+}
+
+.manual-content h3:not(:first-child) {
+  margin-top: 24px;
+}
+
+.manual-section {
+  margin-bottom: 20px;
+}
+
+.manual-section h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ef4444;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.manual-section p {
+  font-size: 13px;
+  color: #cbd5e1;
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.manual-section ul,
+.manual-section ol {
+  font-size: 13px;
+  color: #cbd5e1;
+  margin-left: 20px;
+  margin-bottom: 10px;
+  line-height: 1.7;
+}
+
+.manual-section li {
+  margin-bottom: 4px;
+}
+
+.manual-section li strong {
+  color: #f1f5f9;
+}
+
+.manual-section code {
+  background: #0f172a;
+  color: #22c55e;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: 'Consolas', 'Monaco', monospace;
 }

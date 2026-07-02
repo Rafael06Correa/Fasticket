@@ -14,7 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
     novo: 'Novo Atendimento',
     fila: 'Fila de Rascunhos',
     historico: 'Historico',
-    config: 'Configuracoes'
+    config: 'Configuracoes',
+    manual: 'Manual'
   };
 
   sidebarBtns.forEach(btn => {
@@ -73,7 +74,8 @@ document.addEventListener('DOMContentLoaded', () => {
       modulo: document.getElementById('edit-modulo').value.trim(),
       moduloNome: document.getElementById('edit-modulo').value.trim(),
       titulo: document.getElementById('edit-titulo').value.trim(),
-      descricao: document.getElementById('edit-descricao').value.trim()
+      descricao: document.getElementById('edit-descricao').value.trim(),
+      erro: '' // Limpar erro ao editar
     };
 
     await window.api.fila.update(editandoId, updates);
@@ -127,8 +129,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     container.innerHTML = fila.map(r => {
       const isConcluido = r.concluido === true;
+      const temErro = r.erro && r.erro.trim() !== '';
       return `
-      <div class="rascunho-card ${isConcluido ? 'card-concluido' : ''}">
+      <div class="rascunho-card ${isConcluido ? 'card-concluido' : ''} ${temErro ? 'card-erro' : ''}">
         <div class="rascunho-top">
           <span class="rascunho-empresa">${esc(r.empresaNome || r.empresa)}</span>
           <span class="rascunho-modulo">${esc(r.moduloNome || r.modulo)}</span>
@@ -136,6 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="rascunho-contato">Contato: ${esc(r.contato)}</div>
         <div class="rascunho-titulo">${esc(r.titulo)}</div>
         <div class="rascunho-desc" title="${esc(r.descricao)}">${esc(r.descricao)}</div>
+        ${temErro ? `<div class="rascunho-erro">${esc(r.erro)}</div>` : ''}
         <div class="rascunho-footer">
           <label class="check-concluido">
             <input type="checkbox" data-action="toggle-concluido" data-id="${r._id}" ${isConcluido ? 'checked' : ''}>
@@ -208,6 +212,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  window.api.fila.onItemIniciando((data) => {
+    const text = document.getElementById('status-text');
+    text.textContent = `${data.index}/${data.total}: ${data.item.empresa}`;
+  });
+
   window.api.fila.onItemConcluido((data) => {
     if (data.sucesso) {
       const num = String(data.ticketNum);
@@ -216,6 +225,8 @@ document.addEventListener('DOMContentLoaded', () => {
         : `Ticket #${num} criado com sucesso!`;
       showToast(msg, 5000);
     } else {
+      // Salvar erro no item para exibir no card
+      window.api.fila.update(data.item._id, { erro: data.erro });
       showToast(`Erro: ${data.erro}`, 5000);
     }
     renderFila();
