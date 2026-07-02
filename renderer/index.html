@@ -48,6 +48,10 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             <span>Config</span>
           </button>
+          <button class="sidebar-btn" data-view="manual">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            <span>Manual</span>
+          </button>
         </nav>
 
         <div class="sidebar-footer">
@@ -146,6 +150,107 @@ Estou criando esse ticket a fim de formalizar um atendimento.
               </div>
             </form>
             <div id="config-status" class="status-msg" style="display:none"></div>
+          </section>
+
+          <!-- Manual -->
+          <section id="view-manual" class="view">
+            <div class="manual-content">
+              <h3>Como Usar o Fasticket</h3>
+
+              <div class="manual-section">
+                <h4>1. Configuracao Inicial</h4>
+                <p>Antes de usar, configure suas credenciais do portal Praxio:</p>
+                <ol>
+                  <li>Acesse a aba <strong>Config</strong> na sidebar</li>
+                  <li>Preencha seu <strong>Usuario</strong> e <strong>Senha</strong> do portal</li>
+                  <li>Clique em <strong>Salvar Credenciais</strong></li>
+                </ol>
+              </div>
+
+              <div class="manual-section">
+                <h4>2. Criando um Atendimento</h4>
+                <p>Na aba <strong>Novo</strong>, preencha todos os campos (todos sao obrigatorios):</p>
+                <ul>
+                  <li><strong>Empresa</strong> — Nome exato da empresa no portal</li>
+                  <li><strong>Contato</strong> — Nome do contato na empresa</li>
+                  <li><strong>Modulo</strong> — Ex: LUN, WCE, ADM, SGE</li>
+                  <li><strong>Titulo</strong> — Assunto do chamado</li>
+                  <li><strong>Descricao</strong> — Detalhes do problema</li>
+                </ul>
+                <p>Clique em <strong>Salvar Rascunho</strong> para adicionar a fila.</p>
+              </div>
+
+              <div class="manual-section">
+                <h4>3. Gerenciando a Fila</h4>
+                <p>Na aba <strong>Fila</strong>, voce pode:</p>
+                <ul>
+                  <li><strong>Editar</strong> — Alterar dados de um rascunho</li>
+                  <li><strong>Excluir</strong> — Remover um rascunho da fila</li>
+                  <li><strong>Concluido</strong> — Marcar para o bot fechar o ticket apos criar</li>
+                  <li><strong>Enviar</strong> — Processar um item individual</li>
+                </ul>
+                <p>Clique em <strong>Processar Fila</strong> para enviar todos os rascunhos de uma vez.</p>
+              </div>
+
+              <div class="manual-section">
+                <h4>4. Historico</h4>
+                <p>Na aba <strong>Historico</strong>, veja todos os tickets criados com sucesso, incluindo numero e data.</p>
+              </div>
+
+              <h3>Como o Bot Funciona</h3>
+
+              <div class="manual-section">
+                <h4>Fluxo de Processamento</h4>
+                <p>Ao clicar em Processar, o bot:</p>
+                <ol>
+                  <li>Abre um navegador invisivel (headless)</li>
+                  <li>Faz login no portal Praxio</li>
+                  <li>Para cada rascunho na fila:
+                    <ul>
+                      <li>Seleciona empresa, contato, sistema (SIGA) e modulo</li>
+                      <li>Preenche responsavel (voce)</li>
+                      <li>Grava o ticket</li>
+                      <li>Insere a descricao como tramite</li>
+                      <li>Define natureza e prioridade</li>
+                      <li>Envia como "Em andamento"</li>
+                      <li>Se marcado como Concluido, insere texto de fechamento e envia como "Concluido"</li>
+                    </ul>
+                  </li>
+                </ol>
+              </div>
+
+              <div class="manual-section">
+                <h4>Solucao de Problemas</h4>
+                <ul>
+                  <li><strong>Empresa nao encontrada</strong> — Verifique se o nome esta exatamente igual ao do portal</li>
+                  <li><strong>Modulo nao encontrado</strong> — Confirme o nome do modulo (SGE, LUN, WCE, ADM, etc.)</li>
+                  <li><strong>Erro de login</strong> — Va em Config e verifique usuario e senha</li>
+                  <li><strong>Sessao expirada</strong> — O bot reabre o navegador automaticamente</li>
+                  <li><strong>Item pulado</strong> — Verifique se todos os campos estao preenchidos</li>
+                </ul>
+              </div>
+
+              <div class="manual-section">
+                <h4>Busca de Empresas</h4>
+                <p>O bot busca empresas de duas formas:</p>
+                <ul>
+                  <li><strong>Exato</strong> — O nome digitado e igual ao do portal (confianca 100%)</li>
+                  <li><strong>Inicio</strong> — O nome digitado e o inicio do que esta no portal (ex: "LOCAFAST" encontra "LOCAFAST LTDA")</li>
+                </ul>
+                <p>Se nao encontrar nenhuma correspondencia, o item e pulado.</p>
+              </div>
+
+              <h3>Solucao de Problemas</h3>
+
+              <div class="manual-section">
+                <ul>
+                  <li><strong>Empresa nao encontrada</strong> — Verifique se o nome esta exatamente igual ao do portal</li>
+                  <li><strong>Modulo nao encontrado</strong> — Confirme o nome do modulo (SGE, LUN, WCE, ADM, etc.)</li>
+                  <li><strong>Erro de login</strong> — Va em Config e verifique usuario e senha</li>
+                  <li><strong>Sessao expirada</strong> — O bot reabre o navegador automaticamente</li>
+                </ul>
+              </div>
+            </div>
           </section>
         </div>
       </main>
