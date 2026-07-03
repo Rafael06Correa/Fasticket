@@ -51,13 +51,16 @@ Fasticket/
 ├── renderer/
 │   ├── index.html             # Interface principal
 │   ├── renderer.js            # Lógica do frontend
-│   └── renderer.css           # Estilos (tema dark)
+│   ├── renderer.css           # Estilos (tema dark)
+│   └── logo.png               # Logo do aplicativo
+├── assets/
+│   └── icon.png               # Ícone da barra de tarefas
 ├── db/
 │   ├── fila.db                # Banco de dados da fila
 │   ├── historico.db           # Banco de dados do histórico
 │   └── credenciais.db         # Banco de dados das credenciais
 └── referencias/
-    └── referências visuais do portal
+    └── logo2.0.png            # Logo 2.0 (referência)
 ```
 
 ## Tecnologias
@@ -68,6 +71,7 @@ Fasticket/
 | UI | HTML/CSS/JS vanilla |
 | Automação | Playwright (Chromium headless) |
 | Banco local | NeDB |
+| Logo | logo2.0.png (referência) |
 
 ## Licença
 
