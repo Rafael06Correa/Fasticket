@@ -161,6 +161,8 @@ ipcMain.handle('fila:processar', async (event, itens) => {
           await db.historico.insert({
             numero: String(resultado.ticketNum),
             empresa: item.empresaNome || item.empresa,
+            contato: item.contato,
+            telefone: item.telefone || '',
             criadoEm: new Date().toISOString()
           });
           await db.fila.remove({ _id: item._id });
