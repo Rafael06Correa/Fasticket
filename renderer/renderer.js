@@ -20,7 +20,8 @@ document.addEventListener('DOMContentLoaded', () => {
     fila: 'Fila de Rascunhos',
     historico: 'Historico',
     config: 'Configuracoes',
-    manual: 'Manual'
+    manual: 'Manual',
+    logs: 'Logs do Processamento'
   };
 
   sidebarBtns.forEach(btn => {
@@ -92,6 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('edit-contato').value = item.contato || '';
     document.getElementById('edit-modulo').value = item.modulo || '';
     document.getElementById('edit-telefone').value = item.telefone || '';
+    document.getElementById('edit-sistema').value = item.sistema || 'SIGA';
     document.getElementById('edit-titulo').value = item.titulo || '';
     document.getElementById('edit-descricao').value = item.descricao || '';
     modal.classList.add('active');
@@ -116,6 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
       contato: document.getElementById('edit-contato').value.trim(),
       modulo: document.getElementById('edit-modulo').value.trim(),
       moduloNome: document.getElementById('edit-modulo').value.trim(),
+      sistema: document.getElementById('edit-sistema').value,
       telefone: document.getElementById('edit-telefone').value.trim(),
       titulo: document.getElementById('edit-titulo').value.trim(),
       descricao: document.getElementById('edit-descricao').value.trim(),
@@ -141,6 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
       contato: document.getElementById('campo-contato').value.trim(),
       modulo: moduloVal,
       moduloNome: moduloVal,
+      sistema: document.getElementById('campo-sistema').value,
       telefone: document.getElementById('campo-telefone').value.trim(),
       titulo: document.getElementById('campo-titulo').value.trim(),
       descricao: document.getElementById('campo-descricao').value.trim(),
@@ -151,6 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
     await window.api.fila.add(rascunho);
     e.target.reset();
     document.getElementById('campo-descricao').value = MSG_PADRAO;
+    document.getElementById('campo-sistema').value = 'SIGA';
     showToast('Rascunho salvo na fila!');
     updateBadge();
   });
@@ -183,7 +188,10 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="rascunho-card ${isConcluido ? 'card-concluido' : ''} ${temErro ? 'card-erro' : ''}" style="animation-delay: ${i * 0.05}s">
         <div class="rascunho-top">
           <span class="rascunho-empresa">${esc(r.empresaNome || r.empresa)}</span>
-          <span class="rascunho-modulo">${esc(r.moduloNome || r.modulo)}</span>
+          <div class="rascunho-tags">
+            <span class="rascunho-modulo">${esc(r.moduloNome || r.modulo)}</span>
+            <span class="rascunho-sistema">${esc(r.sistema || 'SIGA')}</span>
+          </div>
         </div>
         <div class="rascunho-contato">Contato: ${esc(r.contato)}</div>
         <div class="rascunho-titulo">${esc(r.titulo)}</div>
@@ -246,6 +254,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.api.fila.processar(fila);
     showToast(`Processando ${fila.length} atendimento(s)...`);
+  });
+
+  // ========== LOGS ==========
+  const logContainer = document.getElementById('lista-logs');
+  const logCount = document.getElementById('logs-count');
+  let logMessages = [];
+
+  function renderLogEntry(entry) {
+    const div = document.createElement('div');
+    div.className = `log-entry log-${entry.type}`;
+    div.innerHTML = `<span class="log-time">${esc(entry.time)}</span>${esc(entry.text)}`;
+    logContainer.appendChild(div);
+    logContainer.scrollTop = logContainer.scrollHeight;
+    logMessages.push(entry);
+    logCount.textContent = logMessages.length + ' mensagem(ns)';
+  }
+
+  window.api.logs.onMessage((data) => {
+    if (logContainer.querySelector('.empty-state')) {
+      logContainer.innerHTML = '';
+    }
+    renderLogEntry(data);
+  });
+
+  window.api.logs.onClear(() => {
+    logContainer.innerHTML = `
+      <div class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        <p>Nenhum log ainda. Inicie o processamento para ver os logs aqui.</p>
+      </div>`;
+    logMessages = [];
+    logCount.textContent = '0 mensagem(ns)';
+  });
+
+  document.getElementById('btn-limpar-logs').addEventListener('click', () => {
+    logContainer.innerHTML = `
+      <div class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        <p>Nenhum log ainda. Inicie o processamento para ver os logs aqui.</p>
+      </div>`;
+    logMessages = [];
+    logCount.textContent = '0 mensagem(ns)';
   });
 
   // ========== IPC LISTENERS ==========

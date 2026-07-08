@@ -60,6 +60,10 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
             <span>Manual</span>
           </button>
+          <button class="sidebar-btn" data-view="logs">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+            <span>Logs</span>
+          </button>
         </nav>
 
         <div class="sidebar-footer">
@@ -96,6 +100,17 @@
                 <div class="form-group">
                   <label for="campo-telefone">Telefone</label>
                   <input type="text" id="campo-telefone" placeholder="Ex: (11) 99999-9999">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="campo-sistema">Sistema</label>
+                  <select id="campo-sistema" required>
+                    <option value="SIGA i">SIGA i</option>
+                    <option value="SIGA" selected>SIGA</option>
+                    <option value="Siga One">Siga One</option>
+                    <option value="Siga Emissor">Siga Emissor</option>
+                  </select>
                 </div>
               </div>
               <div class="form-group full">
@@ -205,6 +220,20 @@ Estou criando esse ticket a fim de formalizar um atendimento.
                   <div class="theme-preview" style="background: linear-gradient(135deg, #3B4252, #4C566A)"></div>
                   <span>Nord</span>
                 </button>
+              </div>
+            </div>
+          </section>
+
+          <!-- Logs -->
+          <section id="view-logs" class="view">
+            <div class="logs-top">
+              <span class="logs-count" id="logs-count">0 mensagem(ns)</span>
+              <button id="btn-limpar-logs" class="btn btn-danger">Limpar</button>
+            </div>
+            <div id="lista-logs" class="logs-container">
+              <div class="empty-state">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                <p>Nenhum log ainda. Inicie o processamento para ver os logs aqui.</p>
               </div>
             </div>
           </section>
@@ -342,6 +371,15 @@ Estou criando esse ticket a fim de formalizar um atendimento.
             <label for="edit-telefone">Telefone</label>
             <input type="text" id="edit-telefone">
           </div>
+        </div>
+        <div class="form-group full">
+          <label for="edit-sistema">Sistema</label>
+          <select id="edit-sistema" required>
+            <option value="SIGA i">SIGA i</option>
+            <option value="SIGA">SIGA</option>
+            <option value="Siga One">Siga One</option>
+            <option value="Siga Emissor">Siga Emissor</option>
+          </select>
         </div>
         <div class="form-group full">
           <label for="edit-titulo">Titulo (Assunto)</label>

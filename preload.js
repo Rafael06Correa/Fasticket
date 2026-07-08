@@ -12,6 +12,11 @@ contextBridge.exposeInMainWorld('api', {
     onItemIniciando: (cb) => ipcRenderer.on('fila:item-iniciando', (e, data) => cb(data)),
     onItemConcluido: (cb) => ipcRenderer.on('fila:item-concluido', (e, data) => cb(data))
   },
+  logs: {
+    onMessage: (cb) => ipcRenderer.on('logs:message', (e, data) => cb(data)),
+    onClear: (cb) => ipcRenderer.on('logs:clear', () => cb()),
+    clear: () => ipcRenderer.send('logs:clear')
+  },
   historico: {
     get: () => ipcRenderer.invoke('historico:get'),
     add: (entry) => ipcRenderer.invoke('historico:add', entry),

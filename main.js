@@ -41,6 +41,10 @@ function createWindow() {
 
 // ========== IPC HANDLERS ==========
 
+ipcMain.on('logs:clear', (event) => {
+  mainWindow.webContents.send('logs:clear');
+});
+
 ipcMain.handle('fila:get', async () => {
   return await db.fila.find({}).sort({ criadoEm: -1 });
 });
@@ -94,6 +98,12 @@ ipcMain.handle('fila:processar', async (event, itens) => {
   if (isProcessing) return { error: 'Ja existe processamento em andamento' };
   isProcessing = true;
   mainWindow.webContents.send('fila:status', { processando: true });
+
+  // Conectar logger ao renderer
+  logger.setRendererSender((logData) => {
+    mainWindow.webContents.send('logs:message', logData);
+  });
+  mainWindow.webContents.send('logs:clear');
 
   const idsProcessados = [];
 
@@ -246,6 +256,7 @@ ipcMain.handle('fila:processar', async (event, itens) => {
     logger.error(err.message);
   } finally {
     isProcessing = false;
+    logger.setRendererSender(null);
     mainWindow.webContents.send('fila:status', { processando: false });
   }
 

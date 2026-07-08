@@ -215,7 +215,13 @@ class PlaywrightBot {
     if (item.contato) {
       const contatoResult = await this.selectFromChosen('TicketMlo_OperadorContato_Id_chosen', item.contato);
       if (!contatoResult.ok) {
-        logger.step('Selecionando contato', false, 'Contato não encontrado');
+        logger.step('Selecionando contato', false, 'Contato não encontrado, buscando fallback ADM...');
+        const admResult = await this.selectAdmContact();
+        if (admResult.ok) {
+          logger.step('Selecionando contato (fallback ADM)', true, `Encontrado: "${admResult.text}"`);
+        } else {
+          logger.step('Selecionando contato', false, 'Nenhum contato ADM encontrado');
+        }
       } else {
         const contatoInfo = contatoResult.exact ? null : `Encontrado: "${contatoResult.text}" (busca: "${item.contato}")`;
         logger.step('Selecionando contato', true, contatoInfo);
@@ -224,13 +230,14 @@ class PlaywrightBot {
     }
 
     // 3. Selecionar sistema
-    const sistemaResult = await this.selectFromChosen('Sistema_chosen', 'SIGA');
+    const sistema = item.sistema || 'SIGA';
+    const sistemaResult = await this.selectFromChosen('Sistema_chosen', sistema);
     if (!sistemaResult.ok) {
       logger.step('Selecionando sistema', false, sistemaResult.reason);
       try { await this.ensureTicketPage(); } catch (e) {}
-      return { ok: false, erro: 'Sistema não encontrado: SIGA' };
+      return { ok: false, erro: 'Sistema não encontrado: ' + sistema };
     }
-    const sistemaInfo = sistemaResult.exact ? null : `Encontrado: "${sistemaResult.text}" (busca: "SIGA")`;
+    const sistemaInfo = sistemaResult.exact ? null : `Encontrado: "${sistemaResult.text}" (busca: "${sistema}")`;
     logger.step('Selecionando sistema', true, sistemaInfo);
     await sleep(1500);
 
@@ -410,6 +417,41 @@ A sua satisfação é o nosso maior objetivo! Agradecemos se puder avaliar o nos
     }
 
     return false;
+  }
+
+  async selectAdmContact() {
+    return await this.page.evaluate(() => {
+      const containerId = 'TicketMlo_OperadorContato_Id_chosen';
+      const container = document.getElementById(containerId);
+      if (!container) return { ok: false, reason: 'container not found' };
+
+      const selectId = containerId.replace(/_chosen$/, '');
+      const selectEl = document.getElementById(selectId);
+      if (!selectEl) return { ok: false, reason: 'select not found' };
+
+      const options = selectEl.querySelectorAll('option');
+      let admMatch = null;
+
+      for (const opt of options) {
+        if (!opt.value || opt.value === '') continue;
+        const txt = opt.textContent.trim().toUpperCase();
+        if (txt.includes('ADM')) {
+          admMatch = opt;
+          break;
+        }
+      }
+
+      if (admMatch) {
+        selectEl.value = admMatch.value;
+        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        if (typeof $ !== 'undefined' && $(selectEl).trigger) {
+          $(selectEl).trigger('chosen:updated');
+        }
+        return { ok: true, text: admMatch.textContent.trim() };
+      }
+
+      return { ok: false, reason: 'Nenhum contato ADM encontrado' };
+    });
   }
 
   async preencherNaturezaPrioridade() {

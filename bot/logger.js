@@ -5,13 +5,25 @@
 let startTime = null;
 let currentStep = 0;
 let totalSteps = 10;
+let sendToRenderer = null;
+
+function setRendererSender(sender) {
+  sendToRenderer = sender;
+}
+
+function emit(msg, type) {
+  console.log(`[${timestamp()}] ${msg}`);
+  if (sendToRenderer) {
+    sendToRenderer({ text: msg, type: type || 'info', time: new Date().toLocaleTimeString('pt-BR') });
+  }
+}
 
 function timestamp() {
   return new Date().toLocaleTimeString('pt-BR');
 }
 
 function log(msg) {
-  console.log(`[${timestamp()}] ${msg}`);
+  emit(msg, 'info');
 }
 
 function separator() {
@@ -20,82 +32,77 @@ function separator() {
 
 function startAutomation() {
   startTime = Date.now();
-  log('Iniciando automação...');
+  emit('Iniciando automação...', 'info');
 }
 
 function loginSuccess() {
-  log('Login realizado com sucesso.');
+  emit('Login realizado com sucesso.', 'success');
 }
 
 function systemReady() {
-  log('Sistema pronto para processar chamados.');
+  emit('Sistema pronto para processar chamados.', 'info');
 }
 
 function startTicket(itemIndex, totalItems, item) {
   separator();
-  console.log(`\nProcessando chamado ${itemIndex} de ${totalItems}\n`);
-  console.log(`Empresa : ${item.empresa}`);
-  console.log(`Contato : ${item.contato || 'N/A'}`);
-  console.log(`Sistema : SIGA`);
-  console.log(`Módulo  : ${item.modulo || 'N/A'}\n`);
+  emit(`Processando chamado ${itemIndex} de ${totalItems}`, 'info');
+  emit(`Empresa : ${item.empresa}`, 'info');
+  emit(`Contato : ${item.contato || 'N/A'}`, 'info');
+  emit(`Sistema : ${item.sistema || 'SIGA'}`, 'info');
+  emit(`Módulo  : ${item.modulo || 'N/A'}`, 'info');
   currentStep = 0;
 }
 
 function step(description, success = true, detail = null) {
   currentStep++;
   const status = success ? 'OK' : 'ERRO';
+  const type = success ? 'success' : 'error';
   let line = `[${currentStep}/${totalSteps}] ${description}... ${status}`;
+  emit(line, type);
   if (detail) {
-    console.log(line);
-    console.log(`        ${detail}`);
-  } else {
-    console.log(line);
+    emit(`        ${detail}`, type);
   }
 }
 
 function ticketGenerated(ticketNum) {
-  console.log(`        Ticket gerado: ${ticketNum}`);
+  emit(`        Ticket gerado: ${ticketNum}`, 'success');
 }
 
 function result(success, ticketNum = null, errorMsg = null) {
   separator();
-  console.log('\nResultado\n');
   if (success) {
-    console.log(`Status : SUCESSO`);
-    console.log(`Ticket : ${ticketNum}`);
+    emit(`Status : SUCESSO`, 'success');
+    emit(`Ticket : ${ticketNum}`, 'success');
   } else {
-    console.log(`Status : ERRO`);
-    console.log(`Erro   : ${errorMsg}`);
+    emit(`Status : ERRO`, 'error');
+    emit(`Erro   : ${errorMsg}`, 'error');
   }
-  
+
   if (startTime) {
     const elapsed = Math.floor((Date.now() - startTime) / 1000);
-    console.log(`Tempo  : ${elapsed} segundos`);
+    emit(`Tempo  : ${elapsed} segundos`, 'info');
   }
-  
-  console.log('');
-  log('Processamento concluído.');
+
+  emit('Processamento concluído.', 'info');
   separator();
 }
 
 function error(msg) {
-  log(`ERRO: ${msg}`);
+  emit(`ERRO: ${msg}`, 'error');
 }
 
 function skip(reason) {
   separator();
-  log(`PULANDO CHAMADO: ${reason}`);
+  emit(`PULANDO CHAMADO: ${reason}`, 'warning');
   separator();
 }
 
 function info(msg) {
-  log(msg);
+  emit(msg, 'info');
 }
 
-// Log de erros de página (silencioso, apenas para debug)
 function pageError(msg) {
-  // Não mostra erros de página no console limpo
-  // Apenas loga se precisar de debug
+  // silencioso
 }
 
 module.exports = {
@@ -112,5 +119,6 @@ module.exports = {
   error,
   skip,
   info,
-  pageError
+  pageError,
+  setRendererSender
 };

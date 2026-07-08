@@ -4,17 +4,31 @@
   "description": "Fasticket - Automação de Tickets no Praxio",
   "main": "main.js",
   "build": {
-    "icon": "assets/icon.png"
+    "appId": "com.fasticket.app",
+    "productName": "Fasticket",
+    "icon": "assets/icon.png",
+    "win": {
+      "target": "portable"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "bot/**/*",
+      "renderer/**/*",
+      "assets/**/*",
+      "package.json"
+    ]
   },
   "scripts": {
     "start": "electron .",
-    "build": "npx @electron/packager . Fasticket --platform=win32 --arch=x64 --out=./out --overwrite --icon=assets/icon.png"
+    "build": "electron-builder --win portable"
   },
   "dependencies": {
     "nedb-promises": "^6.2.3",
     "playwright-core": "^1.61.1"
   },
   "devDependencies": {
-    "electron": "^28.0.0"
+    "electron": "^28.3.3",
+    "electron-builder": "^26.15.3"
   }
 }
