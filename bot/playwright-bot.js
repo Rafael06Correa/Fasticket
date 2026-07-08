@@ -59,7 +59,7 @@ class PlaywrightBot {
   async login(usuario, senha) {
     this.usuario = usuario;
     await this.page.goto(LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await sleep(3000);
+    await sleep(2000);
 
     const loginField = await this.page.$('#txtLogin');
     const passField = await this.page.$('#txtSenha');
@@ -70,15 +70,15 @@ class PlaywrightBot {
     }
 
     await loginField.fill(usuario);
-    await sleep(200);
+    await sleep(150);
     await passField.fill(senha);
-    await sleep(300);
+    await sleep(200);
 
     await Promise.all([
       this.page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {}),
       btnEntrar.click()
     ]);
-    await sleep(3000);
+    await sleep(2000);
 
     if (this.page.url().includes('/Home/Index')) {
       throw new Error('Login falhou - credenciais invalidas');
@@ -86,7 +86,7 @@ class PlaywrightBot {
 
     logger.loginSuccess();
     await this.page.goto(TICKET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await sleep(4000);
+    await sleep(2000);
 
     const pageType = await this.detectPage();
     if (pageType === 'login') {
@@ -122,6 +122,7 @@ class PlaywrightBot {
         const allOpts = [];
         let exactMatch = null;
         let startsWithMatch = null;
+        let containsMatch = null;
 
         for (const opt of options) {
           if (!opt.value || opt.value === '') continue;
@@ -140,10 +141,15 @@ class PlaywrightBot {
           if (!startsWithMatch && normTxt.startsWith(normalizedSearch)) {
             startsWithMatch = opt;
           }
+
+          // Match em qualquer parte do texto (ex: "FR" em "FRE - Fretamento")
+          if (!containsMatch && normTxt.includes(normalizedSearch)) {
+            containsMatch = opt;
+          }
         }
 
-        // Priorizar match exato, senão usar startsWith
-        const bestMatch = exactMatch || startsWithMatch;
+        // Priorizar: exato > startsWith > contains
+        const bestMatch = exactMatch || startsWithMatch || containsMatch;
 
         if (bestMatch) {
           selectEl.value = bestMatch.value;
@@ -192,7 +198,7 @@ class PlaywrightBot {
 
   async processarItem(item) {
     await this.ensureTicketPage();
-    await sleep(1500);
+    await sleep(1000);
 
     // 1. Selecionar empresa
     const empresaResult = await this.selectFromChosen('TicketMlo_Cliente_Codigo_chosen', item.empresa);
@@ -203,7 +209,7 @@ class PlaywrightBot {
     }
     const empresaInfo = empresaResult.exact ? null : `Encontrado: "${empresaResult.text}" (busca: "${item.empresa}")`;
     logger.step('Selecionando empresa', true, empresaInfo);
-    await sleep(3000);
+    await sleep(1500);
 
     // 2. Selecionar contato
     if (item.contato) {
@@ -214,7 +220,7 @@ class PlaywrightBot {
         const contatoInfo = contatoResult.exact ? null : `Encontrado: "${contatoResult.text}" (busca: "${item.contato}")`;
         logger.step('Selecionando contato', true, contatoInfo);
       }
-      await sleep(1500);
+      await sleep(1000);
     }
 
     // 3. Selecionar sistema
@@ -226,7 +232,7 @@ class PlaywrightBot {
     }
     const sistemaInfo = sistemaResult.exact ? null : `Encontrado: "${sistemaResult.text}" (busca: "SIGA")`;
     logger.step('Selecionando sistema', true, sistemaInfo);
-    await sleep(2000);
+    await sleep(1500);
 
     // 4. Selecionar módulo
     if (item.modulo) {
@@ -238,13 +244,13 @@ class PlaywrightBot {
       }
       const moduloInfo = moduloResult.exact ? null : `Encontrado: "${moduloResult.text}" (busca: "${item.modulo}")`;
       logger.step('Selecionando módulo', true, moduloInfo);
-      await sleep(2000);
+      await sleep(1500);
     }
 
     // 5. Definir responsável
     const responsavelOk = await this.selectResponsavel(this.usuario);
     logger.step('Definindo responsável', responsavelOk, responsavelOk ? null : 'Responsável não encontrado');
-    await sleep(1000);
+    await sleep(800);
 
     // 6. Preencher informações
     if (item.titulo) {
@@ -299,7 +305,7 @@ class PlaywrightBot {
     } catch (e) {
       // Não houve redirect
     }
-    await sleep(3000);
+    await sleep(2000);
 
     const erros = await this.page.evaluate(() => {
       const errosEl = document.querySelectorAll('.validation-summary-errors li, .alert-danger, .field-validation-error');
@@ -322,21 +328,26 @@ class PlaywrightBot {
 
     // 8. Inserir descrição
     if (item.descricao) {
-      await sleep(3000);
+      await sleep(2000);
       await this.inserirTramite(item.descricao);
+      await sleep(1500);
       logger.step('Inserindo descrição', true);
     }
 
     // 9. Definir prioridade
+    await sleep(1000);
     await this.preencherNaturezaPrioridade();
+    await sleep(1000);
     logger.step('Definindo prioridade', true);
 
     // 10. Enviar para atendimento
+    await sleep(1000);
     await this.enviarTramite('Em andamento');
+    await sleep(1500);
     logger.step('Enviando para atendimento', true);
 
     if (item.concluido) {
-      await sleep(3000);
+      await sleep(2000);
       const textoConclusao = `Olá.
 
 Estamos concluindo o atendimento.
@@ -345,6 +356,7 @@ Em caso de necessidade, salientamos que esse ticket pode ser reaberto em até 5 
 A sua satisfação é o nosso maior objetivo! Agradecemos se puder avaliar o nosso atendimento e também a solução dada para a sua demanda.
 :)`;
       await this.inserirTramite(textoConclusao);
+      await sleep(1500);
       await this.enviarTramite('Concluido');
     }
 
@@ -393,7 +405,7 @@ A sua satisfação é o nosso maior objetivo! Agradecemos se puder avaliar o nos
       if (selecionado.ok) return true;
 
       if (tentativa < 2) {
-        await sleep(2000);
+        await sleep(1000);
       }
     }
 
@@ -454,7 +466,7 @@ A sua satisfação é o nosso maior objetivo! Agradecemos se puder avaliar o nos
         if (typeof $ !== 'undefined') $(s).trigger('chosen:updated');
       }
     }, statusVal);
-    await sleep(500);
+    await sleep(800);
 
     await this.page.evaluate(() => {
       const btn = document.querySelector('#btnListaStatus');
@@ -469,13 +481,13 @@ A sua satisfação é o nosso maior objetivo! Agradecemos se puder avaliar o nos
         if (item.id === id) { item.click(); break; }
       }
     }, itemId);
-    await sleep(500);
+    await sleep(800);
 
     await this.page.evaluate(() => {
       const btn = document.querySelector('#btnEnviar');
       if (btn) btn.click();
     });
-    await sleep(3000);
+    await sleep(2000);
 
     let encontrouDialog = await this.page.evaluate(() => {
       const botoes = document.querySelectorAll('button[data-bb-handler="confirm"]');
@@ -496,6 +508,8 @@ A sua satisfação é o nosso maior objetivo! Agradecemos se puder avaliar o nos
       return { ok: false };
     });
 
+    await sleep(1000);
+
     if (!encontrouDialog.ok) {
       await this.page.evaluate(() => {
         const form = document.querySelector('#frmTicketPrincipal');
@@ -505,7 +519,7 @@ A sua satisfação é o nosso maior objetivo! Agradecemos se puder avaliar o nos
           form.submit();
         }
       });
-      await sleep(4000);
+      await sleep(2000);
     }
   }
 
@@ -525,6 +539,8 @@ A sua satisfação é o nosso maior objetivo! Agradecemos se puder avaliar o nos
       }, htmlTramite),
       10000, 'preencher-editor-tramite'
     );
+    
+    await sleep(1000);
   }
 
   async ensureTicketPage() {
@@ -551,10 +567,10 @@ A sua satisfação é o nosso maior objetivo! Agradecemos se puder avaliar o nos
       });
 
       if (clicked) {
-        await sleep(4000);
+        await sleep(2000);
       } else {
         await this.page.goto(TICKET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await sleep(4000);
+        await sleep(2000);
       }
     }
 
@@ -564,7 +580,7 @@ A sua satisfação é o nosso maior objetivo! Agradecemos se puder avaliar o nos
 
     if (page === 'lista') {
       await this.page.goto(TICKET_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await sleep(4000);
+      await sleep(2000);
     }
   }
 

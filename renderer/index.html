@@ -7,6 +7,14 @@
   <link rel="stylesheet" href="renderer.css">
 </head>
 <body>
+  <!-- Splash Screen -->
+  <div class="splash" id="splash">
+    <img src="logo.png" alt="Fasticket" class="splash-logo">
+    <div class="splash-text">Fasticket</div>
+    <div class="splash-sub">Automacao de Tickets</div>
+    <div class="splash-bar"><div class="splash-bar-fill"></div></div>
+  </div>
+
   <div class="app">
     <!-- Titlebar -->
     <div class="titlebar">
@@ -85,7 +93,10 @@
                   <label for="campo-modulo">Modulo</label>
                   <input type="text" id="campo-modulo" placeholder="Ex: LUN, WCE, ADM" required>
                 </div>
-                <div class="form-group placeholder-group"></div>
+                <div class="form-group">
+                  <label for="campo-telefone">Telefone</label>
+                  <input type="text" id="campo-telefone" placeholder="Ex: (11) 99999-9999">
+                </div>
               </div>
               <div class="form-group full">
                 <label for="campo-titulo">Titulo (Assunto)</label>
@@ -150,6 +161,52 @@ Estou criando esse ticket a fim de formalizar um atendimento.
               </div>
             </form>
             <div id="config-status" class="status-msg" style="display:none"></div>
+
+            <div class="form-card" style="margin-top: 16px;">
+              <p class="form-desc">Aparencia do aplicativo.</p>
+              <div class="theme-grid">
+                <button class="theme-option" data-theme="corporate-blue">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #1D4ED8, #2563EB)"></div>
+                  <span>Corporate Blue</span>
+                </button>
+                <button class="theme-option" data-theme="ocean-teal">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #0F766E, #14B8A6)"></div>
+                  <span>Ocean Teal</span>
+                </button>
+                <button class="theme-option" data-theme="emerald">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #047857, #10B981)"></div>
+                  <span>Emerald</span>
+                </button>
+                <button class="theme-option" data-theme="slate-orange">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #3F3F46, #52525B)"></div>
+                  <span>Slate & Orange</span>
+                </button>
+                <button class="theme-option" data-theme="dark-blue">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #1E3A8A, #3B82F6)"></div>
+                  <span>Dark Blue</span>
+                </button>
+                <button class="theme-option" data-theme="dark-emerald">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #065F46, #10B981)"></div>
+                  <span>Dark Emerald</span>
+                </button>
+                <button class="theme-option" data-theme="dark-crimson">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #7F1D1D, #B91C1C)"></div>
+                  <span>Dark Crimson</span>
+                </button>
+                <button class="theme-option" data-theme="graphite-gold">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #27272A, #3F3F46)"></div>
+                  <span>Graphite & Gold</span>
+                </button>
+                <button class="theme-option" data-theme="purple-tech">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #5B21B6, #8B5CF6)"></div>
+                  <span>Purple Tech</span>
+                </button>
+                <button class="theme-option" data-theme="nord">
+                  <div class="theme-preview" style="background: linear-gradient(135deg, #3B4252, #4C566A)"></div>
+                  <span>Nord</span>
+                </button>
+              </div>
+            </div>
           </section>
 
           <!-- Manual -->
@@ -169,13 +226,14 @@ Estou criando esse ticket a fim de formalizar um atendimento.
 
               <div class="manual-section">
                 <h4>2. Criando um Atendimento</h4>
-                <p>Na aba <strong>Novo</strong>, preencha todos os campos (todos sao obrigatorios):</p>
+                <p>Na aba <strong>Novo</strong>, preencha os campos:</p>
                 <ul>
-                  <li><strong>Empresa</strong> — Nome exato da empresa no portal</li>
-                  <li><strong>Contato</strong> — Nome do contato na empresa</li>
-                  <li><strong>Modulo</strong> — Ex: LUN, WCE, ADM, SGE</li>
-                  <li><strong>Titulo</strong> — Assunto do chamado</li>
-                  <li><strong>Descricao</strong> — Detalhes do problema</li>
+                  <li><strong>Empresa</strong> (obrigatorio) — Nome exato da empresa no portal</li>
+                  <li><strong>Contato</strong> (obrigatorio) — Nome do contato na empresa</li>
+                  <li><strong>Modulo</strong> (obrigatorio) — Ex: LUN, WCE, ADM, SGE</li>
+                  <li><strong>Telefone</strong> (opcional) — Para controle interno</li>
+                  <li><strong>Titulo</strong> (obrigatorio) — Assunto do chamado</li>
+                  <li><strong>Descricao</strong> (obrigatorio) — Detalhes do problema</li>
                 </ul>
                 <p>Clique em <strong>Salvar Rascunho</strong> para adicionar a fila.</p>
               </div>
@@ -275,9 +333,15 @@ Estou criando esse ticket a fim de formalizar um atendimento.
             <input type="text" id="edit-contato" required>
           </div>
         </div>
-        <div class="form-group full">
-          <label for="edit-modulo">Modulo</label>
-          <input type="text" id="edit-modulo" required>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="edit-modulo">Modulo</label>
+            <input type="text" id="edit-modulo" required>
+          </div>
+          <div class="form-group">
+            <label for="edit-telefone">Telefone</label>
+            <input type="text" id="edit-telefone">
+          </div>
         </div>
         <div class="form-group full">
           <label for="edit-titulo">Titulo (Assunto)</label>

@@ -1,6 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
   const MSG_PADRAO = 'Prezados,\n\ntudo bem?\n\nEstou criando esse ticket a fim de formalizar um atendimento.\n\n';
 
+  // ========== SPLASH SCREEN ==========
+  setTimeout(() => {
+    document.getElementById('splash').classList.add('hidden');
+  }, 1800);
+
   // ========== TITLEBAR ==========
   document.getElementById('btn-minimize').addEventListener('click', () => window.api.window.minimize());
   document.getElementById('btn-maximize').addEventListener('click', () => window.api.window.maximize());
@@ -39,6 +44,43 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => { toast.style.display = 'none'; }, duration);
   }
 
+  // ========== SKELETON LOADING ==========
+  function showSkeletonFila(container) {
+    const count = Math.floor(Math.random() * 2) + 3;
+    container.innerHTML = Array(count).fill(`
+      <div class="skeleton">
+        <div class="skeleton-row">
+          <div class="skeleton-line w60"></div>
+          <div class="skeleton-line w40"></div>
+        </div>
+        <div class="skeleton-line w40"></div>
+        <div class="skeleton-line w80"></div>
+        <div class="skeleton-footer">
+          <div class="skeleton-btn"></div>
+          <div style="display:flex;gap:6px">
+            <div class="skeleton-btn"></div>
+            <div class="skeleton-btn"></div>
+            <div class="skeleton-btn"></div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function showSkeletonHistorico(container) {
+    const count = Math.floor(Math.random() * 2) + 3;
+    container.innerHTML = Array(count).fill(`
+      <div class="skeleton" style="display:flex;align-items:center;gap:12px">
+        <div class="skeleton-btn" style="width:36px;height:36px;border-radius:10px;flex-shrink:0"></div>
+        <div style="flex:1">
+          <div class="skeleton-line w40"></div>
+          <div class="skeleton-line w60" style="margin-top:8px"></div>
+        </div>
+        <div class="skeleton-line" style="width:80px"></div>
+      </div>
+    `).join('');
+  }
+
   // ========== MODAL EDITAR ==========
   const modal = document.getElementById('modal-editar');
   const formEditar = document.getElementById('form-editar');
@@ -49,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('edit-empresa').value = item.empresa || '';
     document.getElementById('edit-contato').value = item.contato || '';
     document.getElementById('edit-modulo').value = item.modulo || '';
+    document.getElementById('edit-telefone').value = item.telefone || '';
     document.getElementById('edit-titulo').value = item.titulo || '';
     document.getElementById('edit-descricao').value = item.descricao || '';
     modal.classList.add('active');
@@ -73,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
       contato: document.getElementById('edit-contato').value.trim(),
       modulo: document.getElementById('edit-modulo').value.trim(),
       moduloNome: document.getElementById('edit-modulo').value.trim(),
+      telefone: document.getElementById('edit-telefone').value.trim(),
       titulo: document.getElementById('edit-titulo').value.trim(),
       descricao: document.getElementById('edit-descricao').value.trim(),
       erro: '' // Limpar erro ao editar
@@ -97,6 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
       contato: document.getElementById('campo-contato').value.trim(),
       modulo: moduloVal,
       moduloNome: moduloVal,
+      telefone: document.getElementById('campo-telefone').value.trim(),
       titulo: document.getElementById('campo-titulo').value.trim(),
       descricao: document.getElementById('campo-descricao').value.trim(),
       concluido: false,
@@ -112,8 +157,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ========== FILA ==========
   async function renderFila() {
-    const fila = await window.api.fila.get();
     const container = document.getElementById('lista-fila');
+    showSkeletonFila(container);
+
+    await new Promise(r => setTimeout(r, 400));
+
+    const fila = await window.api.fila.get();
     const countEl = document.getElementById('fila-count');
 
     countEl.textContent = fila.length + ' rascunho(s)';
@@ -127,11 +176,11 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    container.innerHTML = fila.map(r => {
+    container.innerHTML = fila.map((r, i) => {
       const isConcluido = r.concluido === true;
       const temErro = r.erro && r.erro.trim() !== '';
       return `
-      <div class="rascunho-card ${isConcluido ? 'card-concluido' : ''} ${temErro ? 'card-erro' : ''}">
+      <div class="rascunho-card ${isConcluido ? 'card-concluido' : ''} ${temErro ? 'card-erro' : ''}" style="animation-delay: ${i * 0.05}s">
         <div class="rascunho-top">
           <span class="rascunho-empresa">${esc(r.empresaNome || r.empresa)}</span>
           <span class="rascunho-modulo">${esc(r.moduloNome || r.modulo)}</span>
@@ -242,8 +291,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   async function renderHistorico() {
-    const hist = await window.api.historico.get();
     const container = document.getElementById('lista-historico');
+    showSkeletonHistorico(container);
+
+    await new Promise(r => setTimeout(r, 400));
+
+    const hist = await window.api.historico.get();
 
     if (hist.length === 0) {
       container.innerHTML = `
@@ -254,13 +307,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    container.innerHTML = hist.map(h => `
-      <div class="historico-card">
+    container.innerHTML = hist.map((h, i) => `
+      <div class="historico-card" style="animation-delay: ${i * 0.05}s">
         <div class="historico-left">
           <div class="historico-icon">#</div>
           <div class="historico-info">
             <span class="historico-ticket">#${esc(String(h.numero))}</span>
             <span class="historico-empresa">${esc(h.empresa)}</span>
+            ${h.telefone ? `<span class="historico-telefone">${esc(h.telefone)}</span>` : ''}
           </div>
         </div>
         <span class="historico-data">${fmtDate(h.criadoEm)}</span>
@@ -288,6 +342,22 @@ document.addEventListener('DOMContentLoaded', () => {
     status.style.display = 'block';
     setTimeout(() => { status.style.display = 'none'; }, 3000);
   });
+
+  // ========== THEME ==========
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('fasticket-theme', theme);
+    document.querySelectorAll('.theme-option').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.theme === theme);
+    });
+  }
+
+  document.querySelectorAll('.theme-option').forEach(btn => {
+    btn.addEventListener('click', () => applyTheme(btn.dataset.theme));
+  });
+
+  const savedTheme = localStorage.getItem('fasticket-theme') || 'corporate-blue';
+  applyTheme(savedTheme);
 
   // ========== HELPERS ==========
   async function updateBadge() {
